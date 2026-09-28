@@ -157,9 +157,11 @@ export class Renderer {
     time: number,
     input: InputManager
   ): void {
-    for (const fish of world.aliveFish) {
+    // Includes fish still mid-death-fade so their shrink/fade animation plays out.
+    for (const fish of world.fishList) {
       const isControlled = fish === world.controlledCreature;
       this.drawCreature(ctx, fish, isControlled, time, input);
+      this.drawVitalsBars(ctx, fish);
     }
   }
 
@@ -358,10 +360,44 @@ export class Renderer {
     time: number,
     input: InputManager
   ): void {
-    for (const shark of world.aliveSharks) {
+    for (const shark of world.sharks) {
       const isControlled = shark === world.controlledCreature;
       this.drawCreature(ctx, shark, isControlled, time, input);
+      this.drawVitalsBars(ctx, shark);
     }
+  }
+
+  /**
+   * Energy (green/yellow/red, 4px) and health (red, 3px) bars stacked above
+   * a creature. Fades out along with the creature's death animation.
+   */
+  private drawVitalsBars(ctx: CanvasRenderingContext2D, creature: Creature): void {
+    const deathAlpha = creature.isDead ? Math.max(0, 1 - creature.deathFadeTicks / 30) : 1;
+    if (deathAlpha <= 0) return;
+
+    const w = creature.radius * 2;
+    const x = creature.x - w / 2;
+    const energyY = creature.y - creature.radius - 20;
+    const healthY = energyY + 4 + 2;
+
+    ctx.save();
+    ctx.globalAlpha = deathAlpha;
+
+    // Energy bar
+    const ef = Math.max(0, Math.min(1, creature.energyFraction));
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    ctx.fillRect(x - 1, energyY - 1, w + 2, 4 + 2);
+    ctx.fillStyle = ef < 0.2 ? '#ef4444' : ef < 0.5 ? '#facc15' : '#22c55e';
+    ctx.fillRect(x, energyY, w * ef, 4);
+
+    // Health bar
+    const hf = Math.max(0, Math.min(1, creature.healthFraction));
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    ctx.fillRect(x - 1, healthY - 1, w + 2, 3 + 2);
+    ctx.fillStyle = `rgba(239, 68, 68, ${(0.5 + 0.5 * hf).toFixed(2)})`;
+    ctx.fillRect(x, healthY, w * hf, 3);
+
+    ctx.restore();
   }
 
   /**
@@ -418,6 +454,14 @@ export class Renderer {
   ): void {
     ctx.save();
     ctx.translate(creature.x, creature.y);
+
+    // Death animation: fade to transparent and shrink to half size over 30 ticks
+    if (creature.isDead) {
+      const t = Math.min(1, creature.deathFadeTicks / 30);
+      ctx.globalAlpha = 1 - t;
+      ctx.scale(1 - 0.5 * t, 1 - 0.5 * t);
+    }
+
     ctx.rotate(creature.heading);
 
     const isShark = creature.type === 'shark';
@@ -429,7 +473,7 @@ export class Renderer {
     const wagAngle = speed > 5 ? Math.sin(time * wagFrequency + creature.id) * 0.35 : 0;
 
     // Camouflage blending when small fish is under plants: less visible to predators!
-    if (!isShark && creature.isCoveredByPlants) {
+    if (!creature.isDead && !isShark && creature.isCoveredByPlants) {
       ctx.globalAlpha = isControlled ? 0.70 : 0.40;
     }
 
@@ -643,6 +687,17 @@ export class Renderer {
       }
     }
 
+    // Recent-damage flash: red tint overlay for 6 ticks after taking a bite
+    if (creature.recentDamageTicks > 0) {
+      ctx.save();
+      ctx.globalAlpha = (creature.recentDamageTicks / 6) * 0.55;
+      ctx.fillStyle = '#ff1a1a';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.6, r * 1.1, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     // Debug overlays
     if (input.showBoundingCircles) {
       ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
@@ -845,7 +900,7 @@ export class Renderer {
     const x = 16;
     const y = 68;
     const w = 275;
-    const h = 222;
+    const h = 290;
 
     ctx.fillStyle = 'rgba(2, 6, 23, 0.85)';
     ctx.fillRect(x, y, w, h);
@@ -899,20 +954,35 @@ export class Renderer {
     ctx.fillStyle = hungerColor;
     ctx.fillRect(x + 12, y + 84, pbW * hungerRatio, 6);
 
+    // Health bar
+    const healthRatio = c ? c.healthFraction : 0;
+    ctx.font = '10px monospace';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(`Health: ${c ? c.health.toFixed(0) : 0} / ${c ? c.stats.maxHealth : 0}`, x + 12, y + 106);
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+    ctx.fillRect(x + 12, y + 112, pbW, 6);
+    ctx.fillStyle = `rgba(239, 68, 68, ${(0.5 + 0.5 * healthRatio).toFixed(2)})`;
+    ctx.fillRect(x + 12, y + 112, pbW * healthRatio, 6);
+
     ctx.fillStyle = '#cbd5e1';
     ctx.font = '10px monospace';
     const lineSpacing = 15;
-    let textY = y + 108;
+    let textY = y + 136;
 
     ctx.fillText(`Pos: (${c.x.toFixed(0)}, ${c.y.toFixed(0)})`, x + 12, textY);
     textY += lineSpacing;
-    ctx.fillText(`Vel: (${c.vx.toFixed(1)}, ${c.vy.toFixed(1)})`, x + 12, textY);
+    ctx.fillText(`Vel: (${c.vx.toFixed(1)}, ${c.vy.toFixed(1)})  Speed: ${c.speed.toFixed(1)}`, x + 12, textY);
     textY += lineSpacing;
-    ctx.fillText(`Speed: ${c.speed.toFixed(1)} u/s`, x + 12, textY);
+    ctx.fillText(`Heading: ${c.headingDegrees.toFixed(0)}°`, x + 12, textY);
     textY += lineSpacing;
-    ctx.fillText(`Heading: ${c.headingDegrees.toFixed(1)}°`, x + 12, textY);
+    ctx.fillText(`Hunger signal: ${c.hungerSignal.toFixed(2)}`, x + 12, textY);
     textY += lineSpacing;
-    ctx.fillText(`FPS: ${fps.toFixed(0)}  |  Ticks: ${world.ticks}`, x + 12, textY);
+    ctx.fillText(`Bite cooldown: ${Math.max(0, c.biteCooldownTimer)} ticks`, x + 12, textY);
+    textY += lineSpacing;
+    ctx.fillText(`Recent damage: ${c.recentDamage ? 'yes' : 'no'}`, x + 12, textY);
+    textY += lineSpacing;
+    ctx.fillText(`FPS: ${fps.toFixed(0)}  |  Tick: ${world.ticks}`, x + 12, textY);
     textY += lineSpacing;
     ctx.fillText(`Zoom: ${(camera.zoom * 100).toFixed(0)}%  |  Score: ${c.biteScore}`, x + 12, textY);
     textY += lineSpacing;

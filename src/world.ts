@@ -173,13 +173,17 @@ export class World {
 
     if (controlled.type === 'shark') {
       // 1. Shark can bite any alive small fish (camouflage under plants conceals fish from predator)
+      const hitbox = {
+        x: mouth.x + Math.cos(controlled.heading) * CONFIG.species.shark.biteHitboxOffset,
+        y: mouth.y + Math.sin(controlled.heading) * CONFIG.species.shark.biteHitboxOffset,
+      };
       for (const fish of this.aliveFish) {
-        const effectiveRange = fish.isCoveredByPlants
-          ? CONFIG.species.shark.biteRange * 0.35 // Concealed under plant flora: shark must be right on top of fish
-          : CONFIG.species.shark.biteRange;
+        const effectiveRadius = fish.isCoveredByPlants
+          ? CONFIG.species.shark.biteHitboxRadius * 0.35 // Concealed under plant flora: shark must be right on top of fish
+          : CONFIG.species.shark.biteHitboxRadius;
 
-        const dist = Math.hypot(mouth.x - fish.x, mouth.y - fish.y);
-        if (dist <= effectiveRange + fish.radius) {
+        const dist = Math.hypot(hitbox.x - fish.x, hitbox.y - fish.y);
+        if (dist <= effectiveRadius + fish.radius) {
           return true;
         }
       }
@@ -200,8 +204,8 @@ export class World {
         }
       }
       for (const plant of this.plants) {
-        const dist = Math.hypot(mouth.x - plant.x, mouth.y - plant.y);
-        if (dist <= CONFIG.species.fish.biteRange + plant.radius) {
+        const dist = Math.hypot(controlled.x - plant.x, controlled.y - plant.y);
+        if (dist <= controlled.radius + plant.radius) {
           return true;
         }
       }
@@ -232,47 +236,77 @@ export class World {
     };
 
     if (controlled.type === 'shark') {
-      // 1. Try biting an alive Small Fish
+      // Every bite attempt costs energy, hit or miss, to discourage spam.
+      controlled.energy = Math.max(0, controlled.energy - controlled.stats.biteEnergyCost);
+      if (controlled.energy <= 0) {
+        this.killCreature(controlled, 'STARVATION');
+        return false;
+      }
+
+      // 1. Try biting an alive Small Fish: hitbox is a circle offset in front
+      // of the shark's mouth, not an instant kill — it takes several hits.
+      const hitbox = {
+        x: mouth.x + Math.cos(controlled.heading) * controlled.stats.biteHitboxOffset,
+        y: mouth.y + Math.sin(controlled.heading) * controlled.stats.biteHitboxOffset,
+      };
+
       let targetFish: Creature | null = null;
       let minFishDist = Infinity;
 
       for (const fish of this.aliveFish) {
-        const effectiveRange = fish.isCoveredByPlants
-          ? CONFIG.species.shark.biteRange * 0.35 // Concealed under flora: shark needs to be right on top of it!
-          : CONFIG.species.shark.biteRange;
+        const effectiveRadius = fish.isCoveredByPlants
+          ? controlled.stats.biteHitboxRadius * 0.35 // Concealed under flora: shark needs to be right on top of it!
+          : controlled.stats.biteHitboxRadius;
 
-        const dist = Math.hypot(mouth.x - fish.x, mouth.y - fish.y);
-        if (dist <= effectiveRange + fish.radius && dist < minFishDist) {
+        const dist = Math.hypot(hitbox.x - fish.x, hitbox.y - fish.y);
+        if (dist <= effectiveRadius + fish.radius && dist < minFishDist) {
           minFishDist = dist;
           targetFish = fish;
         }
       }
 
       if (targetFish) {
-        // Successful Chomp on Small Fish -> FISH DIES & SPAWNS MEAT REMAINS!
-        const deadX = targetFish.x;
-        const deadY = targetFish.y;
-        targetFish.isDead = true;
-
-        sound.playFishDeath();
-        this.particles.emitBloodCloud(deadX, deadY);
+        targetFish.health = Math.max(0, targetFish.health - controlled.stats.biteDamage);
+        targetFish.recentDamageTicks = 6;
         this.particles.emitBiteImpact(mouth.x, mouth.y);
+        sound.playBiteChomp();
+        controlled.biteScore += 20;
 
-        // Spawn 3 floating meat remains chunks
-        const spawnedMeat = spawnFishRemains(deadX, deadY, 3);
-        this.meatRemains.push(...spawnedMeat);
+        if (targetFish.health <= 0) {
+          // Killing blow -> FISH DIES & SPAWNS MEAT REMAINS!
+          const deadX = targetFish.x;
+          const deadY = targetFish.y;
+          this.killCreature(targetFish, 'EATEN');
 
-        controlled.biteScore += 100;
-        controlled.foodEaten += 1;
-        gainEnergy();
-        createFloatingText(this.floatingTexts, deadX, deadY - 15, 'DEVOURED! +100', '#f43f5e', 1.6, 1.3);
+          sound.playFishDeath();
+          this.particles.emitBloodCloud(deadX, deadY);
 
-        if (targetFish === this.controlledCreature) {
-          const nextFish = this.aliveFish[0];
-          this.setControlledCreature(nextFish || this.sharks[0], false);
+          // Spawn 3 floating meat remains chunks
+          const spawnedMeat = spawnFishRemains(deadX, deadY, 3);
+          this.meatRemains.push(...spawnedMeat);
+
+          controlled.biteScore += 100;
+          controlled.foodEaten += 1;
+          controlled.energy = Math.min(controlled.stats.energyMax, controlled.energy + controlled.stats.preyEnergyGain);
+          createFloatingText(this.floatingTexts, deadX, deadY - 15, '+80', '#facc15', 1.4, 1.6);
+
+          if (targetFish === this.controlledCreature) {
+            const nextFish = this.aliveFish[0];
+            this.setControlledCreature(nextFish || this.sharks[0], false);
+          }
+
+          this.checkCloning(controlled);
+        } else {
+          createFloatingText(
+            this.floatingTexts,
+            targetFish.x,
+            targetFish.y - 10,
+            `-${controlled.stats.biteDamage}`,
+            '#f87171',
+            0.8
+          );
         }
 
-        this.checkCloning(controlled);
         return true;
       }
 
@@ -333,13 +367,13 @@ export class World {
         return true;
       }
 
-      // Check plants
+      // Check plants: true circle-circle overlap between the fish's body and the plant
       let nearestPlantIndex = -1;
       let minPlantDist = Infinity;
       for (let i = 0; i < this.plants.length; i++) {
         const p = this.plants[i];
-        const dist = Math.hypot(mouth.x - p.x, mouth.y - p.y);
-        if (dist <= CONFIG.species.fish.biteRange + p.radius && dist < minPlantDist) {
+        const dist = Math.hypot(controlled.x - p.x, controlled.y - p.y);
+        if (dist <= controlled.radius + p.radius && dist < minPlantDist) {
           minPlantDist = dist;
           nearestPlantIndex = i;
         }
@@ -349,11 +383,11 @@ export class World {
         const plant = this.plants[nearestPlantIndex];
         sound.playPlantNibble();
         this.particles.emitPlantSpores(plant.x, plant.y);
-        createFloatingText(this.floatingTexts, plant.x, plant.y - 10, '+25 NIBBLE!', '#5fff7a', 1.2);
+        createFloatingText(this.floatingTexts, plant.x, plant.y - 10, '+25', '#5fff7a', 1.0);
         this.plants.splice(nearestPlantIndex, 1);
         controlled.biteScore += 25;
         controlled.foodEaten += 1;
-        gainEnergy();
+        controlled.energy = Math.min(controlled.stats.energyMax, controlled.energy + controlled.stats.plantEnergyGain);
 
         this.checkCloning(controlled);
         return true;
@@ -512,42 +546,84 @@ export class World {
   }
 
   /**
-   * Applies passive energy drain each tick; starves a creature to death if it
-   * runs out of energy without having eaten enough to keep itself alive.
+   * Marks a creature dead with a cause (STARVATION or EATEN), logs it, and
+   * starts its 30-tick fade-and-shrink death animation. The creature is only
+   * actually removed from the world once that animation finishes (see
+   * tickAI). There is no aging — these are the only two ways to die.
    */
-  private applyEnergyDrain(creature: Creature, dt: number): void {
+  private killCreature(creature: Creature, cause: 'STARVATION' | 'EATEN'): void {
     if (creature.isDead) return;
-    creature.energy -= creature.stats.energyDrainPerSec * dt;
+    creature.isDead = true;
+    creature.deathCause = cause;
+    creature.deathFadeTicks = 0;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[DEATH] ${creature.type} #${creature.id} died of ${cause} at tick ${this.ticks}, pos=(${creature.x.toFixed(0)}, ${creature.y.toFixed(0)})`
+    );
+  }
+
+  /**
+   * Applies energy drain each tick: a flat idle cost plus an extra cost that
+   * scales with thrust input. Energy reaching 0 starves the creature.
+   */
+  private applyEnergyDrain(creature: Creature, input: CreatureInput): void {
+    if (creature.isDead) return;
+    const thrust = Math.max(0, Math.min(1, input.thrustInput));
+    const drain = creature.stats.idleDrain + (thrust > 0 ? creature.stats.thrustDrain * thrust : 0);
+    creature.energy = Math.max(0, Math.min(creature.stats.energyMax, creature.energy - drain));
     if (creature.energy <= 0) {
-      creature.energy = 0;
-      creature.isDead = true;
+      this.killCreature(creature, 'STARVATION');
+    }
+  }
+
+  /**
+   * A well-fed creature (energy fraction above its species' threshold) slowly
+   * regenerates health each tick. A starving creature never heals.
+   */
+  private applyRegeneration(creature: Creature): void {
+    if (creature.isDead) return;
+    if (creature.energyFraction > creature.stats.regenEnergyThreshold) {
+      creature.health = Math.min(creature.stats.maxHealth, creature.health + creature.stats.regenRate);
     }
   }
 
   /**
    * Multi-agent physics tick (60 Hz, dt = 1/60). Every alive shark and fish
    * moves according to the CreatureInput supplied for it (from an AI agent,
-   * or IDLE_INPUT if none was supplied), and may attempt a bite.
+   * or IDLE_INPUT if none was supplied), and may attempt a bite. Creatures
+   * that died fade out over 30 ticks before being removed from the world.
    */
   public tickAI(inputs: Map<number, CreatureInput>): void {
     const dt = 1 / CONFIG.tick.hz;
     this.ticks++;
 
     for (const shark of this.sharks) {
-      if (shark.isDead) continue;
+      if (shark.isDead) {
+        shark.deathFadeTicks++;
+        continue;
+      }
       const input = inputs.get(shark.id) || IDLE_INPUT;
       shark.tick(input, this.obstacles, dt);
       if (input.wantsBite) this.attemptBite(shark);
-      this.applyEnergyDrain(shark, dt);
+      this.applyEnergyDrain(shark, input);
+      this.applyRegeneration(shark);
     }
 
     for (const fish of this.fishList) {
-      if (fish.isDead) continue;
+      if (fish.isDead) {
+        fish.deathFadeTicks++;
+        continue;
+      }
       const input = inputs.get(fish.id) || IDLE_INPUT;
       fish.tick(input, this.obstacles, dt);
       if (input.wantsBite) this.attemptBite(fish);
-      this.applyEnergyDrain(fish, dt);
+      this.applyEnergyDrain(fish, input);
+      this.applyRegeneration(fish);
     }
+
+    // Drop creatures whose death-fade animation has finished
+    this.sharks = this.sharks.filter((s) => !s.isDead || s.deathFadeTicks < 30);
+    this.fishList = this.fishList.filter((f) => !f.isDead || f.deathFadeTicks < 30);
 
     // Keep the spectated creature valid (camera/HUD) if it just died
     if (!this.controlledCreature || this.controlledCreature.isDead) {
