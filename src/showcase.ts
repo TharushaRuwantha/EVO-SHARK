@@ -23,11 +23,18 @@ export class ActorShowcase {
   private isFishNibbling: boolean = false;
 
   private onSwitchToSim: (target?: PilotTarget) => void;
+  private onOpenFreeArena: () => void;
 
-  constructor(container: HTMLElement, world: World, onSwitchToSim: (target?: PilotTarget) => void) {
+  constructor(
+    container: HTMLElement,
+    world: World,
+    onSwitchToSim: (target?: PilotTarget) => void,
+    onOpenFreeArena: () => void = () => {}
+  ) {
     this.container = container;
     this.world = world;
     this.onSwitchToSim = onSwitchToSim;
+    this.onOpenFreeArena = onOpenFreeArena;
     this.sampleRng = new PRNG(9999);
     this.sampleObstacle = this.generateSampleRock('medium');
 
@@ -102,6 +109,9 @@ export class ActorShowcase {
             </button>
             <button id="menu-btn-pilot-fish-top" class="px-3.5 py-1.5 rounded-xl bg-amber-950/90 border border-amber-500/60 hover:bg-amber-900 text-amber-200 text-xs font-bold transition cursor-pointer shadow">
               <span>🐟</span> Pilot Fish
+            </button>
+            <button id="menu-btn-free-arena" title="Open an independent copy of the simulation for separate testing" class="px-3.5 py-1.5 rounded-xl bg-violet-950/90 border border-violet-500/60 hover:bg-violet-900 text-violet-200 text-xs font-bold transition cursor-pointer shadow">
+              <span>🧪</span> Free Test Arena
             </button>
             <button id="menu-btn-enter-sim" class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 via-teal-500 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-black tracking-wider transition cursor-pointer shadow-lg shadow-cyan-950 hover:scale-[1.03]">
               <span>🌊</span> DIVE INTO OCEAN
@@ -623,6 +633,7 @@ export class ActorShowcase {
     // Top Launch Buttons
     this.container.querySelector('#menu-btn-enter-sim')?.addEventListener('click', () => this.onSwitchToSim());
     this.container.querySelector('#footer-btn-dive')?.addEventListener('click', () => this.onSwitchToSim());
+    this.container.querySelector('#menu-btn-free-arena')?.addEventListener('click', () => this.onOpenFreeArena());
 
     this.container.querySelector('#menu-btn-pilot-shark-top')?.addEventListener('click', () => this.onSwitchToSim('shark'));
     this.container.querySelector('#btn-detail-pilot-shark')?.addEventListener('click', () => this.onSwitchToSim('shark'));
