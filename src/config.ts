@@ -37,6 +37,9 @@ export const CONFIG = {
       biteCooldown: 0.35,
       initialCount: 1,
       foodToClone: 2, // Eating 2 small fish (or equivalent meat) triggers cloning
+      energyMax: 100,
+      energyDrainPerSec: 2.2, // Must hunt regularly or starve
+      energyGainPerFood: 45,
     },
     fish: {
       name: 'Fish (Small Fish)',
@@ -50,7 +53,22 @@ export const CONFIG = {
       biteCooldown: 0.25,
       initialCount: 20, // 20 small fish at startup!
       foodToClone: 3,  // Eating 3 plants or meat remains triggers cloning
+      energyMax: 100,
+      energyDrainPerSec: 1.4,
+      energyGainPerFood: 30,
     },
+  },
+  rl: {
+    hiddenSize: 24,
+    learningRate: 0.01,
+    rewardDiscount: 0.97,
+    baselineDecay: 0.98,
+    maxEpisodeTicks: 60 * 90, // 90s safety cap per generation even without extinction
+    autosaveIntervalSec: 15,
+    perTickSurviveReward: 0.01,
+    eatReward: 1.0,
+    cloneReward: 2.0,
+    deathPenalty: -1.0,
   },
   remains: {
     decayTime: 50,

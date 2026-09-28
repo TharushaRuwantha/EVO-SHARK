@@ -951,8 +951,7 @@ export class Renderer {
     ctx.fillText(popInfo, 16, bannerY + 17);
 
     ctx.textAlign = 'right';
-    const controlsText =
-      'W:Thrust | A/D:Turn | SPACE:Bite (Eat/Kill) | Tab:Cycle Creature | 1:Shark | 2:Fish | E:Regen | M:Showcase';
+    const controlsText = '🤖 AI-controlled (RL training) | E:Regen Plants | R:New Generation | M:Menu';
     ctx.fillText(controlsText, cw - 16, bannerY + 17);
 
     ctx.restore();

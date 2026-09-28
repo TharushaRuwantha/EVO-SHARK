@@ -14,7 +14,6 @@ import {
 } from './plant';
 import { Creature, CreatureInput } from './creature';
 import { MeatRemains, spawnFishRemains, updateMeatRemains } from './food';
-import { InputManager } from './input';
 import { ParticleSystem } from './particles';
 import { sound } from './audio';
 
@@ -91,8 +90,8 @@ export class World {
     return [...this.aliveSharks, ...this.aliveFish];
   }
 
-  public setControlledCreature(target: Creature): void {
-    if (target.isDead) return;
+  public setControlledCreature(target: Creature, playSound: boolean = true): void {
+    if (!target || target.isDead) return;
 
     if (this.controlledCreature) {
       this.controlledCreature.isControlled = false;
@@ -100,7 +99,7 @@ export class World {
 
     this.controlledCreature = target;
     this.controlledCreature.isControlled = true;
-    sound.playSwitchCreature();
+    if (playSound) sound.playSwitchCreature();
   }
 
   public setControlledByIndex(typeIndex: number): void {
@@ -153,8 +152,8 @@ export class World {
    * Check if a biteable target is currently within biting range of the controlled creature.
    * If a small fish is hidden under plants, it is less visible and requires closer proximity.
    */
-  public isTargetInBiteRange(): boolean {
-    const controlled = this.controlledCreature;
+  public isTargetInBiteRange(actor: Creature = this.controlledCreature): boolean {
+    const controlled = actor;
     if (!controlled || controlled.isDead) return false;
     const mouth = controlled.mouthPosition;
 
@@ -197,16 +196,26 @@ export class World {
   }
 
   /**
-   * Executes a bite action on Space bar.
+   * Manual-mode convenience wrapper: bites with the currently spectated creature.
    */
   public performBite(): boolean {
-    const controlled = this.controlledCreature;
+    return this.attemptBite(this.controlledCreature);
+  }
+
+  /**
+   * Executes a bite action for any given creature (used by both manual input and AI agents).
+   */
+  public attemptBite(actor: Creature): boolean {
+    const controlled = actor;
     if (!controlled || controlled.isDead) return false;
 
     const canBite = controlled.triggerBite();
     if (!canBite) return false;
 
     const mouth = controlled.mouthPosition;
+    const gainEnergy = () => {
+      controlled.energy = Math.min(controlled.stats.energyMax, controlled.energy + controlled.stats.energyGainPerFood);
+    };
 
     if (controlled.type === 'shark') {
       // 1. Try biting an alive Small Fish
@@ -241,23 +250,12 @@ export class World {
 
         controlled.biteScore += 100;
         controlled.foodEaten += 1;
+        gainEnergy();
         createFloatingText(this.floatingTexts, deadX, deadY - 15, 'DEVOURED! +100', '#f43f5e', 1.6, 1.3);
 
         if (targetFish === this.controlledCreature) {
           const nextFish = this.aliveFish[0];
-          if (nextFish) {
-            this.setControlledCreature(nextFish);
-            createFloatingText(
-              this.floatingTexts,
-              nextFish.x,
-              nextFish.y - 25,
-              '⚠️ FISH CONSUMED! TRANSFERRED CONTROL',
-              '#facc15',
-              2.2
-            );
-          } else {
-            this.setControlledCreature(this.sharks[0]);
-          }
+          this.setControlledCreature(nextFish || this.sharks[0], false);
         }
 
         this.checkCloning(controlled);
@@ -284,6 +282,7 @@ export class World {
         this.meatRemains.splice(nearestMeatIndex, 1);
         controlled.biteScore += 50;
         controlled.foodEaten += 1;
+        gainEnergy();
 
         this.checkCloning(controlled);
         return true;
@@ -314,6 +313,7 @@ export class World {
         this.meatRemains.splice(nearestMeatIndex, 1);
         controlled.biteScore += 40;
         controlled.foodEaten += 1;
+        gainEnergy();
 
         this.checkCloning(controlled);
         return true;
@@ -339,6 +339,7 @@ export class World {
         this.plants.splice(nearestPlantIndex, 1);
         controlled.biteScore += 25;
         controlled.foodEaten += 1;
+        gainEnergy();
 
         this.checkCloning(controlled);
         return true;
@@ -498,51 +499,62 @@ export class World {
     return { x: CONFIG.world.width / 2, y: CONFIG.world.height / 2 };
   }
 
+  public get isSharkExtinct(): boolean {
+    return this.aliveSharks.length === 0;
+  }
+
+  public get isFishExtinct(): boolean {
+    return this.aliveFish.length === 0;
+  }
+
   /**
-   * Single physics tick (60 Hz, dt = 1/60).
-   * Strictly manual control: creatures do NOT move unless button pressed.
+   * Applies passive energy drain each tick; starves a creature to death if it
+   * runs out of energy without having eaten enough to keep itself alive.
    */
-  public tick(inputManager: InputManager): void {
+  private applyEnergyDrain(creature: Creature, dt: number): void {
+    if (creature.isDead) return;
+    creature.energy -= creature.stats.energyDrainPerSec * dt;
+    if (creature.energy <= 0) {
+      creature.energy = 0;
+      creature.isDead = true;
+    }
+  }
+
+  /**
+   * Multi-agent physics tick (60 Hz, dt = 1/60). Every alive shark and fish
+   * moves according to the CreatureInput supplied for it (from an AI agent,
+   * or IDLE_INPUT if none was supplied), and may attempt a bite.
+   */
+  public tickAI(inputs: Map<number, CreatureInput>): void {
     const dt = 1 / CONFIG.tick.hz;
     this.ticks++;
 
-    const controlledInput = inputManager.getControlledCreatureInput();
-
-    // Check if bite was triggered via input
-    if (controlledInput.wantsBite) {
-      this.performBite();
-    }
-
-    // 1. Tick Controlled Creature (moves with player input)
-    if (this.controlledCreature && !this.controlledCreature.isDead) {
-      this.controlledCreature.tick(controlledInput, this.obstacles, dt);
-    }
-
-    // 2. Tick Uncontrolled Sharks: IDLE INPUT ONLY (coasts to a stop via drag, no autonomous moving)
     for (const shark of this.sharks) {
-      if (shark === this.controlledCreature || shark.isDead) continue;
-      shark.tick(IDLE_INPUT, this.obstacles, dt);
+      if (shark.isDead) continue;
+      const input = inputs.get(shark.id) || IDLE_INPUT;
+      shark.tick(input, this.obstacles, dt);
+      if (input.wantsBite) this.attemptBite(shark);
+      this.applyEnergyDrain(shark, dt);
     }
 
-    // 3. Tick Uncontrolled Small Fish: IDLE INPUT ONLY (coasts to a stop via drag, no flocking or wandering)
     for (const fish of this.fishList) {
-      if (fish === this.controlledCreature || fish.isDead) continue;
-      fish.tick(IDLE_INPUT, this.obstacles, dt);
+      if (fish.isDead) continue;
+      const input = inputs.get(fish.id) || IDLE_INPUT;
+      fish.tick(input, this.obstacles, dt);
+      if (input.wantsBite) this.attemptBite(fish);
+      this.applyEnergyDrain(fish, dt);
     }
 
-    // 4. Update camouflage state under plants
+    // Keep the spectated creature valid (camera/HUD) if it just died
+    if (!this.controlledCreature || this.controlledCreature.isDead) {
+      const fallback = this.aliveSharks[0] || this.aliveFish[0];
+      if (fallback) this.setControlledCreature(fallback, false);
+    }
+
     this.updatePlantCover();
-
-    // 5. Update Meat Remains physics & decay
     updateMeatRemains(this.meatRemains, dt);
-
-    // 6. Floating text updates
     updateFloatingTexts(this.floatingTexts, dt);
-
-    // 7. Particle updates
     this.particles.update(dt);
-
-    // 8. Plant vegetative reproduction
     updatePlantReproduction(this.plants, this.obstacles, this.rng, dt, this.plantTimer);
   }
 }

@@ -27,6 +27,7 @@ export class Creature {
   public foodEaten: number = 0;
   public foodToClone: number;
   public cloneCount: number = 0;
+  public energy: number;
 
   // Bite mechanics & animation
   public biteCooldownTimer: number = 0;
@@ -42,6 +43,7 @@ export class Creature {
     this.y = y;
     this.heading = heading;
     this.foodToClone = this.stats.foodToClone;
+    this.energy = this.stats.energyMax;
   }
 
   get radius(): number {
