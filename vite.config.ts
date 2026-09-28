@@ -17,6 +17,13 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // Proxy checkpoint save/load calls to the local RL save-server (`npm run server`).
+      proxy: {
+        '/api': {
+          target: 'http://localhost:5175',
+          changeOrigin: true,
+        },
+      },
     },
   };
 });

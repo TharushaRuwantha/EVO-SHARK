@@ -6,6 +6,7 @@ import { Camera } from './camera';
 import { Renderer } from './render';
 import { ActorShowcase, PilotTarget } from './showcase';
 import { sound } from './audio';
+import { Trainer } from './rl/trainer';
 
 type ViewMode = 'simulation' | 'showcase' | 'free';
 
@@ -29,7 +30,7 @@ function bootstrap(): void {
 
   // Canvas (full-bleed, no border, so the ocean map fills the entire viewport)
   const canvas = document.createElement('canvas');
-  canvas.className = 'w-full h-full block cursor-crosshair';
+  canvas.className = 'w-full h-full block';
   simWrapper.appendChild(canvas);
 
   // 2. Showcase Wrapper
@@ -50,53 +51,52 @@ function bootstrap(): void {
         <span>☰</span> <span class="hidden sm:inline">Main Menu</span>
       </button>
       <span id="mode-badge" class="hidden px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-400/30 text-violet-300 font-semibold text-[10px] tracking-wide items-center gap-1.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span> Free Test Arena
+        <span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span> Free Test Arena (not saved)
       </span>
     </div>
 
-    <!-- Center: Creature Controller Switcher (Shark / Small Fish) -->
-    <div id="controller-switcher" class="flex items-center gap-3">
-      <div class="flex items-center bg-white/[0.04] p-1 rounded-xl border border-white/10 gap-0.5">
-        <button id="btn-ctrl-shark" class="px-3.5 py-1.5 rounded-lg font-semibold transition-all duration-150 flex items-center gap-1.5 bg-cyan-500/15 text-cyan-200 cursor-pointer active:scale-95">
-          <span>🦈</span> <span id="label-shark">Shark</span>
-        </button>
-        <button id="btn-ctrl-fish" class="px-3.5 py-1.5 rounded-lg font-medium transition-all duration-150 flex items-center gap-1.5 text-slate-400 hover:text-slate-200 cursor-pointer active:scale-95">
-          <span>🐟</span> <span id="label-fish">Fish (20 alive)</span>
-        </button>
-      </div>
-
-      <!-- Quick Bite Action Indicator / Button -->
-      <button id="btn-quick-bite" class="px-3.5 py-1.5 rounded-xl font-semibold transition-all duration-150 flex items-center gap-1.5 border border-white/10 bg-white/[0.04] text-slate-400 cursor-pointer active:scale-95">
-        <span>💥</span> <span id="bite-button-text">Bite</span> <kbd class="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">Space</kbd>
-      </button>
+    <!-- Center: Live Training Stats -->
+    <div id="training-stats" class="flex items-center gap-2 sm:gap-4 px-1 font-mono text-[11px] text-slate-300">
+      <span class="flex items-center gap-1.5 text-slate-400">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="stat-status">Loading…</span>
+      </span>
+      <span>Gen <span id="stat-generation" class="text-slate-100 font-semibold">0</span></span>
+      <span class="hidden md:inline">Steps <span id="stat-steps" class="text-slate-100 font-semibold">0</span></span>
+      <span class="text-sky-300">🦈 <span id="stat-shark-alive">0</span> <span class="text-slate-500 hidden lg:inline">avg r=<span id="stat-shark-reward" class="text-sky-200">0</span></span></span>
+      <span class="text-amber-300">🐟 <span id="stat-fish-alive">0</span> <span class="text-slate-500 hidden lg:inline">avg r=<span id="stat-fish-reward" class="text-amber-200">0</span></span></span>
     </div>
 
     <!-- Right: Quick Environment Actions -->
     <div class="flex items-center gap-2">
+      <button id="btn-save-now" title="Save training checkpoint now" class="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-400/30 hover:bg-emerald-500/20 text-emerald-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>💾</span> <span class="hidden lg:inline">Save</span>
+      </button>
+
       <button id="btn-top-regen-plants" title="Regenerate all plants in the ocean" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
         <span>🌱</span> <span class="hidden lg:inline">Regen Plants</span>
       </button>
 
-      <button id="btn-toggle-follow" title="Toggle camera following creature" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
+      <button id="btn-toggle-follow" title="Toggle camera following the spectated creature" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
         <span>🎥</span> <span class="hidden lg:inline">Follow</span>
       </button>
 
-      <button id="btn-reset-world" title="Reset ocean with fresh seed" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
-        <span>🔄</span> <span class="hidden lg:inline">Reset</span>
+      <button id="btn-reset-world" title="Force-start a new generation now (keeps learned weights)" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>🔄</span> <span class="hidden lg:inline">New Gen</span>
       </button>
 
       <button id="btn-toggle-sound" title="Toggle sound effects" class="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
         🔊
       </button>
 
-      <button id="btn-toggle-help" title="Controls help" class="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
+      <button id="btn-toggle-help" title="About this training mode" class="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
         ❓
       </button>
     </div>
   `;
   appContainer.appendChild(topBar);
 
-  // Controls Modal / Guide
+  // Info Modal / Guide
   const helpModal = document.createElement('div');
   helpModal.id = 'help-modal';
   helpModal.className =
@@ -105,55 +105,33 @@ function bootstrap(): void {
     <div class="bg-slate-950/95 border border-white/10 rounded-3xl p-7 max-w-md w-full shadow-2xl text-slate-200">
       <div class="flex items-center justify-between pb-4 border-b border-white/[0.06]">
         <h3 class="text-base font-semibold text-slate-50 flex items-center gap-2.5">
-          <span>🎮</span> Controls & Ecosystem Guide
+          <span>🤖</span> Reinforcement Learning Mode
         </h3>
         <button id="btn-close-help" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors duration-150 cursor-pointer">✕</button>
       </div>
 
-      <div class="mt-4 flex flex-col gap-0.5 text-xs">
-        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
-          <span class="text-slate-400">Thrust forward</span>
-          <span class="text-slate-100 font-medium">W or ↑</span>
-        </div>
-        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
-          <span class="text-slate-400">Turn left / right</span>
-          <span class="text-slate-100 font-medium">A / D or ← / →</span>
-        </div>
-        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
-          <span class="text-slate-400">Bite (must bite to eat/kill)</span>
-          <span class="text-rose-300 font-medium">Space</span>
-        </div>
-        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
-          <span class="text-slate-400">Switch / cycle creature</span>
-          <span class="text-slate-100 font-medium">Tab, 1, or 2</span>
-        </div>
-        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
-          <span class="text-slate-400">Click any creature</span>
-          <span class="text-slate-100 font-medium">Instantly pilots it</span>
-        </div>
-        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
-          <span class="text-slate-400">Shark eats small fish</span>
-          <span class="text-slate-300">Spawns meat remains</span>
-        </div>
-        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
-          <span class="text-slate-400">Eat enough to clone</span>
-          <span class="text-slate-300">Fish: 3 · Shark: 2</span>
-        </div>
-        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
-          <span class="text-slate-400">Regenerate plants</span>
-          <span class="text-slate-100 font-medium">E</span>
-        </div>
-        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+      <div class="mt-4 flex flex-col gap-3 text-sm text-slate-300 leading-relaxed">
+        <p>Every shark and every small fish is piloted by its own species' neural-network policy — there is no scripted or manual control. Both species are trained purely to <strong class="text-slate-100">survive as long as possible</strong> (eating and reproducing help with that).</p>
+        <p>If either species' population hits zero, or a generation runs too long, the ocean automatically resets and a new generation begins — the learned weights are kept, only the environment restarts.</p>
+        <p>Training progress (both networks' weights, episode counts, and reward averages) is periodically saved to a local checkpoint file, and restored automatically next time this page loads — so stopping the server doesn't lose progress.</p>
+      </div>
+
+      <div class="mt-5 flex flex-col gap-0.5 text-xs">
+        <div class="flex justify-between items-center py-2 border-b border-white/[0.05]">
           <span class="text-slate-400">Main menu</span>
           <span class="text-slate-100 font-medium">M or Esc</span>
         </div>
-        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
-          <span class="text-slate-400">Camera pan & zoom</span>
-          <span class="text-slate-300">Wheel / middle drag</span>
+        <div class="flex justify-between items-center py-2 border-b border-white/[0.05]">
+          <span class="text-slate-400">Regenerate plants</span>
+          <span class="text-slate-100 font-medium">E</span>
         </div>
-        <div class="flex justify-between items-center py-2.5">
-          <span class="text-slate-400">Follow camera</span>
-          <span class="text-slate-100 font-medium">F</span>
+        <div class="flex justify-between items-center py-2 border-b border-white/[0.05]">
+          <span class="text-slate-400">Force a new generation</span>
+          <span class="text-slate-100 font-medium">R</span>
+        </div>
+        <div class="flex justify-between items-center py-2">
+          <span class="text-slate-400">Camera pan / zoom / follow</span>
+          <span class="text-slate-300">Wheel · middle drag · F</span>
         </div>
       </div>
 
@@ -171,14 +149,18 @@ function bootstrap(): void {
   const camera = new Camera(canvas, input);
   const renderer = new Renderer(canvas);
 
-  // Main simulation world (#/sim) and an exact, fully independent copy of it
-  // mounted at (#/free) for separate experimentation/testing without ever
-  // touching the state of the main simulation.
+  // Main simulation world (#/sim), persistently trained and checkpointed, and
+  // an exact, fully independent copy mounted at (#/free) for separate,
+  // throwaway experimentation — its agents start fresh and are never saved.
   const simWorld = new World(CONFIG.world.seed);
   const freeWorld = new World(CONFIG.world.seed + 1);
+  const simTrainer = new Trainer(simWorld, { persist: true });
+  const freeTrainer = new Trainer(freeWorld, { persist: false });
+  void simTrainer.init();
 
-  // `world` always points at whichever world is currently active/on-screen.
+  // `world`/`trainer` always point at whichever arena is currently on-screen.
   let world: World = simWorld;
+  let trainer: Trainer = simTrainer;
 
   camera.followTarget = world.controlledCreature;
 
@@ -186,6 +168,13 @@ function bootstrap(): void {
   let showcase: ActorShowcase | null = null;
 
   const modeBadge = topBar.querySelector('#mode-badge');
+  const statStatus = topBar.querySelector('#stat-status');
+  const statGeneration = topBar.querySelector('#stat-generation');
+  const statSteps = topBar.querySelector('#stat-steps');
+  const statSharkAlive = topBar.querySelector('#stat-shark-alive');
+  const statSharkReward = topBar.querySelector('#stat-shark-reward');
+  const statFishAlive = topBar.querySelector('#stat-fish-alive');
+  const statFishReward = topBar.querySelector('#stat-fish-reward');
 
   // Separate Page Router / View Mode Switcher
   function setViewMode(mode: ViewMode, pilotTarget?: PilotTarget): void {
@@ -193,14 +182,13 @@ function bootstrap(): void {
 
     if (mode === 'simulation' || mode === 'free') {
       world = mode === 'free' ? freeWorld : simWorld;
+      trainer = mode === 'free' ? freeTrainer : simTrainer;
     }
 
     if (pilotTarget === 'shark') {
       world.setControlledByIndex(0);
-      updateControllerButtons();
     } else if (pilotTarget === 'fish') {
       world.cycleSmallFish();
-      updateControllerButtons();
     }
 
     if (mode === 'simulation' || mode === 'free') {
@@ -219,7 +207,6 @@ function bootstrap(): void {
         showcase = null;
       }
       camera.followTarget = world.controlledCreature;
-      updateControllerButtons();
       handleResize();
     } else {
       if (window.location.hash !== '#/menu') {
@@ -240,58 +227,20 @@ function bootstrap(): void {
     }
   }
 
-  // Update Creature Controller Buttons UI
-  function updateControllerButtons(): void {
-    const btnShark = topBar.querySelector('#btn-ctrl-shark');
-    const btnFish = topBar.querySelector('#btn-ctrl-fish');
-    const labelShark = topBar.querySelector('#label-shark');
-    const labelFish = topBar.querySelector('#label-fish');
-
-    const controlled = world.controlledCreature;
-    const isShark = controlled && controlled.type === 'shark';
-
-    if (labelShark) {
-      labelShark.textContent = `Shark (${world.aliveSharks.length})`;
+  // Update the live training stats readout in the top bar
+  function updateTrainingStatsUI(): void {
+    const stats = trainer.getStats();
+    if (statStatus) {
+      statStatus.textContent = stats.resumedFromCheckpoint ? 'Resumed' : 'Training';
     }
-    if (labelFish) {
-      labelFish.textContent = `Fish (${world.aliveFish.length} alive)`;
-    }
-
-    if (isShark) {
-      btnShark?.classList.add('bg-cyan-500/15', 'text-cyan-200');
-      btnShark?.classList.remove('text-slate-400');
-      btnFish?.classList.remove('bg-cyan-500/15', 'text-cyan-200');
-      btnFish?.classList.add('text-slate-400');
-    } else {
-      btnFish?.classList.add('bg-cyan-500/15', 'text-cyan-200');
-      btnFish?.classList.remove('text-slate-400');
-      btnShark?.classList.remove('bg-cyan-500/15', 'text-cyan-200');
-      btnShark?.classList.add('text-slate-400');
-    }
+    if (statGeneration) statGeneration.textContent = stats.generation.toString();
+    if (statSteps) statSteps.textContent = stats.totalSteps.toLocaleString();
+    if (statSharkAlive) statSharkAlive.textContent = stats.sharkAlive.toString();
+    if (statSharkReward) statSharkReward.textContent = stats.sharkAvgReward.toFixed(1);
+    if (statFishAlive) statFishAlive.textContent = stats.fishAlive.toString();
+    if (statFishReward) statFishReward.textContent = stats.fishAvgReward.toFixed(1);
 
     camera.followTarget = world.controlledCreature;
-  }
-
-  // Update Bite Prompt & Button UI
-  function updateBiteButtonUI(): void {
-    const quickBiteBtn = topBar.querySelector('#btn-quick-bite');
-    const biteText = topBar.querySelector('#bite-button-text');
-    const inRange = world.isTargetInBiteRange();
-    const controlled = world.controlledCreature;
-
-    if (inRange) {
-      quickBiteBtn?.classList.remove('border-white/10', 'bg-white/[0.04]', 'text-slate-400');
-      quickBiteBtn?.classList.add('border-rose-400/50', 'bg-rose-500/15', 'text-rose-300', 'animate-pulse');
-      if (biteText) {
-        biteText.textContent = controlled?.type === 'shark' ? 'KILL FISH!' : 'BITE FOOD!';
-      }
-    } else {
-      quickBiteBtn?.classList.add('border-white/10', 'bg-white/[0.04]', 'text-slate-400');
-      quickBiteBtn?.classList.remove('border-rose-400/50', 'bg-rose-500/15', 'text-rose-300', 'animate-pulse');
-      if (biteText) {
-        biteText.textContent = 'Bite';
-      }
-    }
   }
 
   // Bind Top Bar UI Clicks
@@ -309,18 +258,8 @@ function bootstrap(): void {
     }
   });
 
-  topBar.querySelector('#btn-ctrl-shark')?.addEventListener('click', () => {
-    world.setControlledByIndex(0);
-    updateControllerButtons();
-  });
-
-  topBar.querySelector('#btn-ctrl-fish')?.addEventListener('click', () => {
-    world.cycleSmallFish();
-    updateControllerButtons();
-  });
-
-  topBar.querySelector('#btn-quick-bite')?.addEventListener('click', () => {
-    world.performBite();
+  topBar.querySelector('#btn-save-now')?.addEventListener('click', () => {
+    void simTrainer.save();
   });
 
   topBar.querySelector('#btn-top-regen-plants')?.addEventListener('click', () => {
@@ -333,9 +272,7 @@ function bootstrap(): void {
   });
 
   topBar.querySelector('#btn-reset-world')?.addEventListener('click', () => {
-    const newSeed = Math.floor(Math.random() * 1000000);
-    world.reset(newSeed);
-    updateControllerButtons();
+    trainer.forceNewGeneration();
   });
 
   const soundBtn = topBar.querySelector('#btn-toggle-sound');
@@ -354,25 +291,9 @@ function bootstrap(): void {
   closeHelpBtn?.addEventListener('click', () => helpModal.classList.add('hidden'));
   gotItHelpBtn?.addEventListener('click', () => helpModal.classList.add('hidden'));
 
-  // Keyboard Event Callbacks
-  input.onSwitchCreature = () => {
-    world.switchControlledCreature();
-    updateControllerButtons();
-  };
-
-  input.onSelectCreature = (index: number) => {
-    if (index === 0) {
-      world.setControlledByIndex(0);
-    } else {
-      world.cycleSmallFish();
-    }
-    updateControllerButtons();
-  };
-
+  // Keyboard Event Callbacks (camera/environment only — every creature is AI-controlled)
   input.onResetWorld = () => {
-    const newSeed = Math.floor(Math.random() * 1000000);
-    world.reset(newSeed);
-    updateControllerButtons();
+    trainer.forceNewGeneration();
   };
 
   input.onToggleFollow = () => {
@@ -390,23 +311,17 @@ function bootstrap(): void {
     setViewMode(currentView === 'showcase' ? 'simulation' : 'showcase');
   };
 
-  input.onBiteTriggered = () => {
-    world.performBite();
-  };
-
-  // Canvas Click to select creatures in world
+  // Canvas click: spectate the clicked creature (camera + HUD focus only — does not control it)
   canvas.addEventListener('click', (e: MouseEvent) => {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     const worldPos = camera.screenToWorld(mouseX, mouseY);
 
-    // Check all alive creatures (sharks and fish)
     for (const c of world.allAliveCreatures) {
       const dist = Math.hypot(worldPos.x - c.x, worldPos.y - c.y);
       if (dist <= c.radius + 18) {
         world.setControlledCreature(c);
-        updateControllerButtons();
         return;
       }
     }
@@ -435,6 +350,12 @@ function bootstrap(): void {
 
   window.addEventListener('resize', handleResize);
   handleResize();
+
+  // Best-effort save if the tab/server is closed abruptly mid-training.
+  window.addEventListener('pagehide', () => simTrainer.saveOnUnload());
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) simTrainer.saveOnUnload();
+  });
 
   // Always boot into the Standalone Menu Page on load
   setViewMode('showcase');
@@ -465,24 +386,25 @@ function bootstrap(): void {
       fpsTimer = 0;
     }
 
-    // Run fixed physics ticks
+    // Run fixed AI-driven physics ticks for whichever arena is on screen
     if (!input.isPaused) {
       accumulator += deltaSec;
       while (accumulator >= tickDt) {
-        world.tick(input);
+        trainer.step();
         accumulator -= tickDt;
       }
     }
+
+    simTrainer.maybeAutosave(currentTime / 1000);
 
     // Update Camera position (smooth tracking if follow enabled)
     camera.followTarget = world.controlledCreature;
     camera.update();
 
-    // Render frame if simulation is active
-    if (currentView === 'simulation') {
+    // Render frame if a simulation arena is active
+    if (currentView === 'simulation' || currentView === 'free') {
       renderer.render(world, camera, input, currentFps, currentTime / 1000);
-      updateBiteButtonUI();
-      updateControllerButtons();
+      updateTrainingStatsUI();
     }
 
     requestAnimationFrame(loop);

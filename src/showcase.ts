@@ -100,17 +100,17 @@ export class ActorShowcase {
 
           <div class="flex items-center gap-2.5">
             <button id="menu-btn-pilot-shark-top" class="px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.07] hover:border-sky-400/40 text-slate-300 hover:text-sky-200 text-xs font-medium transition-all duration-150 cursor-pointer">
-              🦈 Pilot Shark
+              🦈 Watch Shark
             </button>
             <button id="menu-btn-pilot-fish-top" class="px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.07] hover:border-amber-400/40 text-slate-300 hover:text-amber-200 text-xs font-medium transition-all duration-150 cursor-pointer">
-              🐟 Pilot Fish
+              🐟 Watch Fish
             </button>
             <div class="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
-            <button id="menu-btn-free-arena" title="Open an independent copy of the simulation for separate testing" class="px-3.5 py-2 rounded-xl bg-violet-500/10 border border-violet-400/30 hover:bg-violet-500/20 text-violet-200 text-xs font-semibold transition-all duration-150 cursor-pointer">
+            <button id="menu-btn-free-arena" title="Open an independent, unsaved copy of the training run for separate testing" class="px-3.5 py-2 rounded-xl bg-violet-500/10 border border-violet-400/30 hover:bg-violet-500/20 text-violet-200 text-xs font-semibold transition-all duration-150 cursor-pointer">
               🧪 Free Test Arena
             </button>
             <button id="menu-btn-enter-sim" class="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition-all duration-150 cursor-pointer shadow-lg shadow-cyan-500/20">
-              🌊 Dive Into Ocean
+              🌊 Watch Live Training
             </button>
           </div>
         </header>
@@ -216,7 +216,7 @@ export class ActorShowcase {
                   <span class="text-3xl">🦈</span>
                   <div>
                     <h3 class="text-xl font-bold text-slate-50">The Shark</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Apex predator · controllable with key 1</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Apex predator · AI-controlled, trained to survive</p>
                   </div>
                 </div>
                 <div class="flex items-center gap-2.5">
@@ -224,7 +224,7 @@ export class ActorShowcase {
                     💥 Test Chomp
                   </button>
                   <button id="btn-detail-pilot-shark" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs cursor-pointer transition-all duration-150 shadow-lg shadow-sky-500/20">
-                    Pilot Shark →
+                    Watch Shark →
                   </button>
                 </div>
               </div>
@@ -264,12 +264,12 @@ export class ActorShowcase {
                   <span class="font-semibold text-slate-100 text-sm">14 u / 2.5 kg</span>
                 </div>
                 <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
-                  <span class="text-slate-500 block text-[11px] mb-1">Controls</span>
-                  <span class="font-semibold text-slate-100 text-sm">W/A/S/D or arrows</span>
+                  <span class="text-slate-500 block text-[11px] mb-1">Movement</span>
+                  <span class="font-semibold text-slate-100 text-sm">Learned policy network</span>
                 </div>
                 <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
-                  <span class="text-slate-500 block text-[11px] mb-1">Chomp Hotkey</span>
-                  <span class="font-semibold text-slate-100 text-sm">Spacebar</span>
+                  <span class="text-slate-500 block text-[11px] mb-1">Starves Without Food</span>
+                  <span class="font-semibold text-slate-100 text-sm">Yes — energy drains over time</span>
                 </div>
               </div>
             </div>
@@ -281,7 +281,7 @@ export class ActorShowcase {
                   <span class="text-3xl">🐟</span>
                   <div>
                     <h3 class="text-xl font-bold text-slate-50">Small Fish</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Forager · controllable with key 2</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Forager · AI-controlled, trained to survive</p>
                   </div>
                 </div>
                 <div class="flex items-center gap-2.5">
@@ -289,7 +289,7 @@ export class ActorShowcase {
                     🌿 Test Nibble
                   </button>
                   <button id="btn-detail-pilot-fish" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs cursor-pointer transition-all duration-150 shadow-lg shadow-amber-500/20">
-                    Pilot Fish →
+                    Watch Fish →
                   </button>
                 </div>
               </div>
@@ -311,9 +311,9 @@ export class ActorShowcase {
                   </p>
                 </div>
                 <div class="p-4 rounded-2xl bg-amber-500/[0.06] border border-amber-400/15 flex items-start gap-3 text-sm">
-                  <span class="text-xl mt-0.5">🛑</span>
+                  <span class="text-xl mt-0.5">🧠</span>
                   <p class="text-slate-300 leading-relaxed">
-                    <strong class="text-amber-300 font-semibold">Still until piloted.</strong> Fish stay stationary until moved with <kbd class="px-1.5 py-0.5 rounded bg-white/10 text-slate-200 text-xs">W/A/S/D</kbd> — no random drift.
+                    <strong class="text-amber-300 font-semibold">Learns to flee.</strong> Every fish shares one policy network, trained purely on staying alive — avoiding sharks and finding food.
                   </p>
                 </div>
               </div>
@@ -530,12 +530,12 @@ export class ActorShowcase {
         <!-- ================= BOTTOM STATUS FOOTER ================= -->
         <footer class="px-6 sm:px-10 py-4 border-t border-white/[0.06] bg-slate-950/70 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500 shrink-0">
           <div class="flex items-center gap-3 flex-wrap">
-            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">W/A/S/D</kbd> Move</span>
-            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">Space</kbd> Bite</span>
-            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">1</kbd> Shark <kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">2</kbd> Fish</span>
+            <span class="flex items-center gap-1.5">🤖 Every creature is AI-controlled — trained to survive</span>
+            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">M</kbd> Menu</span>
+            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">R</kbd> New Gen</span>
           </div>
           <button id="footer-btn-dive" class="text-cyan-300 hover:text-cyan-200 font-medium cursor-pointer transition-colors duration-150">
-            Launch Simulation →
+            Watch Live Training →
           </button>
         </footer>
 
