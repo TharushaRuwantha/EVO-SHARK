@@ -42,55 +42,54 @@ function bootstrap(): void {
   const topBar = document.createElement('nav');
   topBar.id = 'top-nav-bar';
   topBar.className =
-    'absolute top-3 left-3 right-3 sm:left-4 sm:right-4 z-40 flex flex-wrap items-center justify-between gap-2.5 px-3.5 sm:px-4 py-2.5 rounded-2xl bg-slate-950/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.5)] text-xs text-slate-200 select-none transition-colors duration-300';
+    'absolute top-4 left-4 right-4 z-40 flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-slate-950/70 backdrop-blur-xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.45)] text-xs text-slate-200 select-none';
   topBar.innerHTML = `
     <!-- Left: Return to Standalone Menu Page + Mode Badge -->
-    <div class="flex items-center gap-2">
-      <button id="btn-back-to-menu" title="Return to Standalone Menu Page (M or Esc)" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-900 to-blue-900 border border-cyan-500/70 hover:from-cyan-800 hover:to-blue-800 text-cyan-200 font-bold transition-all duration-150 flex items-center gap-2 cursor-pointer shadow-md hover:shadow-cyan-950 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
-        <span>☰</span> <span class="hidden sm:inline">Main Menu</span> <kbd class="px-1 py-0.5 rounded bg-cyan-950 text-[10px] text-cyan-300 font-mono">M</kbd>
+    <div class="flex items-center gap-3">
+      <button id="btn-back-to-menu" title="Return to Standalone Menu Page (M or Esc)" class="px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-200 font-medium transition-all duration-150 flex items-center gap-2 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60">
+        <span>☰</span> <span class="hidden sm:inline">Main Menu</span>
       </button>
-      <span id="mode-badge" class="hidden px-2.5 py-1 rounded-lg bg-violet-950/80 border border-violet-500/60 text-violet-300 font-bold text-[10px] tracking-widest uppercase items-center gap-1.5">
+      <span id="mode-badge" class="hidden px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-400/30 text-violet-300 font-semibold text-[10px] tracking-wide items-center gap-1.5">
         <span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span> Free Test Arena
       </span>
     </div>
 
     <!-- Center: Creature Controller Switcher (Shark / Small Fish) -->
-    <div id="controller-switcher" class="flex items-center gap-2">
-      <span class="text-[11px] font-mono text-slate-400 uppercase tracking-wider hidden sm:inline">Pilot:</span>
-      <div class="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800">
-        <button id="btn-ctrl-shark" class="px-3 py-1.5 rounded-lg font-bold transition-all duration-150 flex items-center gap-1.5 bg-sky-950 border border-sky-500/80 text-sky-300 shadow-sm cursor-pointer active:scale-95">
-          <span>🦈</span> <span id="label-shark">Shark</span> <kbd class="px-1 py-0.5 rounded bg-sky-900/80 text-[10px] text-sky-200 font-mono">1</kbd>
+    <div id="controller-switcher" class="flex items-center gap-3">
+      <div class="flex items-center bg-white/[0.04] p-1 rounded-xl border border-white/10 gap-0.5">
+        <button id="btn-ctrl-shark" class="px-3.5 py-1.5 rounded-lg font-semibold transition-all duration-150 flex items-center gap-1.5 bg-cyan-500/15 text-cyan-200 cursor-pointer active:scale-95">
+          <span>🦈</span> <span id="label-shark">Shark</span>
         </button>
-        <button id="btn-ctrl-fish" class="px-3 py-1.5 rounded-lg font-medium transition-all duration-150 flex items-center gap-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-800/80 cursor-pointer active:scale-95">
-          <span>🐟</span> <span id="label-fish">Fish (20 alive)</span> <kbd class="px-1 py-0.5 rounded bg-slate-800 text-[10px] text-slate-400 font-mono">2</kbd>
+        <button id="btn-ctrl-fish" class="px-3.5 py-1.5 rounded-lg font-medium transition-all duration-150 flex items-center gap-1.5 text-slate-400 hover:text-slate-200 cursor-pointer active:scale-95">
+          <span>🐟</span> <span id="label-fish">Fish (20 alive)</span>
         </button>
       </div>
 
       <!-- Quick Bite Action Indicator / Button -->
-      <button id="btn-quick-bite" class="px-3 py-1.5 rounded-xl font-bold transition-all duration-150 flex items-center gap-1.5 border border-slate-700 bg-slate-900 text-slate-400 cursor-pointer shadow-md active:scale-95">
-        <span>💥</span> <span id="bite-button-text">Bite</span> <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono">Space</kbd>
+      <button id="btn-quick-bite" class="px-3.5 py-1.5 rounded-xl font-semibold transition-all duration-150 flex items-center gap-1.5 border border-white/10 bg-white/[0.04] text-slate-400 cursor-pointer active:scale-95">
+        <span>💥</span> <span id="bite-button-text">Bite</span> <kbd class="px-1.5 py-0.5 rounded bg-white/10 text-[10px]">Space</kbd>
       </button>
     </div>
 
     <!-- Right: Quick Environment Actions -->
-    <div class="flex items-center gap-1.5 sm:gap-2">
-      <button id="btn-top-regen-plants" title="Regenerate all plants in the ocean" class="px-2.5 py-1.5 rounded-xl bg-emerald-950/70 border border-emerald-600/50 hover:bg-emerald-900/60 text-emerald-300 font-semibold flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
-        <span>🌱</span> <span class="hidden lg:inline">Regen Plants</span> <kbd class="hidden md:inline px-1 py-0.5 rounded bg-emerald-900/80 text-[10px] text-emerald-200 font-mono">E</kbd>
+    <div class="flex items-center gap-2">
+      <button id="btn-top-regen-plants" title="Regenerate all plants in the ocean" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>🌱</span> <span class="hidden lg:inline">Regen Plants</span>
       </button>
 
-      <button id="btn-toggle-follow" title="Toggle camera following creature" class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium flex items-center gap-1 transition-all duration-150 cursor-pointer active:scale-95">
-        <span>🎥</span> <span class="hidden lg:inline">Follow</span> <kbd class="hidden md:inline px-1 py-0.5 rounded bg-slate-800 text-[10px] font-mono">F</kbd>
+      <button id="btn-toggle-follow" title="Toggle camera following creature" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>🎥</span> <span class="hidden lg:inline">Follow</span>
       </button>
 
-      <button id="btn-reset-world" title="Reset ocean with fresh seed" class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium flex items-center gap-1 transition-all duration-150 cursor-pointer active:scale-95">
-        <span>🔄</span> <span class="hidden lg:inline">Reset</span> <kbd class="hidden md:inline px-1 py-0.5 rounded bg-slate-800 text-[10px] font-mono">R</kbd>
+      <button id="btn-reset-world" title="Reset ocean with fresh seed" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>🔄</span> <span class="hidden lg:inline">Reset</span>
       </button>
 
-      <button id="btn-toggle-sound" title="Toggle sound effects" class="p-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
+      <button id="btn-toggle-sound" title="Toggle sound effects" class="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
         🔊
       </button>
 
-      <button id="btn-toggle-help" title="Controls help" class="p-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
+      <button id="btn-toggle-help" title="Controls help" class="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
         ❓
       </button>
     </div>
@@ -101,66 +100,66 @@ function bootstrap(): void {
   const helpModal = document.createElement('div');
   helpModal.id = 'help-modal';
   helpModal.className =
-    'hidden absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4';
+    'hidden absolute inset-0 z-40 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4';
   helpModal.innerHTML = `
-    <div class="bg-slate-950 border border-cyan-800/60 rounded-2xl p-6 max-w-md w-full shadow-2xl text-slate-200 text-xs">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-        <h3 class="text-base font-bold text-cyan-300 flex items-center gap-2">
+    <div class="bg-slate-950/95 border border-white/10 rounded-3xl p-7 max-w-md w-full shadow-2xl text-slate-200">
+      <div class="flex items-center justify-between pb-4 border-b border-white/[0.06]">
+        <h3 class="text-base font-semibold text-slate-50 flex items-center gap-2.5">
           <span>🎮</span> Controls & Ecosystem Guide
         </h3>
-        <button id="btn-close-help" class="text-slate-400 hover:text-white text-base font-bold cursor-pointer">✕</button>
+        <button id="btn-close-help" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors duration-150 cursor-pointer">✕</button>
       </div>
 
-      <div class="mt-4 space-y-3 font-mono">
-        <div class="flex justify-between py-1 border-b border-slate-900">
-          <span class="text-slate-400">Thrust Forward:</span>
-          <span class="text-cyan-300 font-bold">W or ↑</span>
+      <div class="mt-4 flex flex-col gap-0.5 text-xs">
+        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+          <span class="text-slate-400">Thrust forward</span>
+          <span class="text-slate-100 font-medium">W or ↑</span>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-900">
-          <span class="text-slate-400">Turn Left / Right:</span>
-          <span class="text-cyan-300 font-bold">A / D or ← / →</span>
+        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+          <span class="text-slate-400">Turn left / right</span>
+          <span class="text-slate-100 font-medium">A / D or ← / →</span>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-900">
-          <span class="text-slate-400">Bite (Must Bite to Eat/Kill):</span>
-          <span class="text-rose-400 font-bold">SPACE BAR</span>
+        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+          <span class="text-slate-400">Bite (must bite to eat/kill)</span>
+          <span class="text-rose-300 font-medium">Space</span>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-900">
-          <span class="text-slate-400">Switch / Cycle Creature:</span>
-          <span class="text-amber-300 font-bold">Tab (or 1: Shark, 2: Fish)</span>
+        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+          <span class="text-slate-400">Switch / cycle creature</span>
+          <span class="text-slate-100 font-medium">Tab, 1, or 2</span>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-900">
-          <span class="text-slate-400">Click Any Creature:</span>
-          <span class="text-cyan-300 font-bold">Instantly Pilots It</span>
+        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+          <span class="text-slate-400">Click any creature</span>
+          <span class="text-slate-100 font-medium">Instantly pilots it</span>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-900">
-          <span class="text-slate-400">Shark Eats Small Fish:</span>
-          <span class="text-rose-400">Fish dies & spawns meat remains</span>
+        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+          <span class="text-slate-400">Shark eats small fish</span>
+          <span class="text-slate-300">Spawns meat remains</span>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-900">
-          <span class="text-slate-400">Eat Enough to Clone:</span>
-          <span class="text-emerald-400">Fish: 3 foods · Shark: 2 foods</span>
+        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+          <span class="text-slate-400">Eat enough to clone</span>
+          <span class="text-slate-300">Fish: 3 · Shark: 2</span>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-900">
-          <span class="text-slate-400">Regenerate Plants:</span>
-          <span class="text-emerald-400 font-bold">E</span>
+        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+          <span class="text-slate-400">Regenerate plants</span>
+          <span class="text-slate-100 font-medium">E</span>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-900">
-          <span class="text-slate-400">Actor Showcase View:</span>
-          <span class="text-cyan-300 font-bold">M</span>
+        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+          <span class="text-slate-400">Main menu</span>
+          <span class="text-slate-100 font-medium">M or Esc</span>
         </div>
-        <div class="flex justify-between py-1 border-b border-slate-900">
-          <span class="text-slate-400">Camera Pan & Zoom:</span>
-          <span class="text-slate-300">Mouse Wheel / Middle Drag</span>
+        <div class="flex justify-between items-center py-2.5 border-b border-white/[0.05]">
+          <span class="text-slate-400">Camera pan & zoom</span>
+          <span class="text-slate-300">Wheel / middle drag</span>
         </div>
-        <div class="flex justify-between py-1">
-          <span class="text-slate-400">Follow Camera:</span>
-          <span class="text-slate-300">F</span>
+        <div class="flex justify-between items-center py-2.5">
+          <span class="text-slate-400">Follow camera</span>
+          <span class="text-slate-100 font-medium">F</span>
         </div>
       </div>
 
-      <div class="mt-5 pt-3 border-t border-slate-800 text-center">
-        <button id="btn-help-got-it" class="px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-wide cursor-pointer transition">
-          Got it!
+      <div class="mt-6 text-center">
+        <button id="btn-help-got-it" class="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold cursor-pointer transition-colors duration-150">
+          Got it
         </button>
       </div>
     </div>
@@ -259,14 +258,14 @@ function bootstrap(): void {
     }
 
     if (isShark) {
-      btnShark?.classList.add('bg-sky-950', 'border-sky-500/80', 'text-sky-300', 'shadow-sm');
-      btnShark?.classList.remove('text-slate-400', 'border-transparent');
-      btnFish?.classList.remove('bg-amber-950', 'border-amber-500/80', 'text-amber-300', 'shadow-sm');
+      btnShark?.classList.add('bg-cyan-500/15', 'text-cyan-200');
+      btnShark?.classList.remove('text-slate-400');
+      btnFish?.classList.remove('bg-cyan-500/15', 'text-cyan-200');
       btnFish?.classList.add('text-slate-400');
     } else {
-      btnFish?.classList.add('bg-amber-950', 'border-amber-500/80', 'text-amber-300', 'shadow-sm');
-      btnFish?.classList.remove('text-slate-400', 'border-transparent');
-      btnShark?.classList.remove('bg-sky-950', 'border-sky-500/80', 'text-sky-300', 'shadow-sm');
+      btnFish?.classList.add('bg-cyan-500/15', 'text-cyan-200');
+      btnFish?.classList.remove('text-slate-400');
+      btnShark?.classList.remove('bg-cyan-500/15', 'text-cyan-200');
       btnShark?.classList.add('text-slate-400');
     }
 
@@ -281,14 +280,14 @@ function bootstrap(): void {
     const controlled = world.controlledCreature;
 
     if (inRange) {
-      quickBiteBtn?.classList.remove('border-slate-700', 'bg-slate-900', 'text-slate-400');
-      quickBiteBtn?.classList.add('border-rose-500', 'bg-rose-950', 'text-rose-300', 'animate-pulse');
+      quickBiteBtn?.classList.remove('border-white/10', 'bg-white/[0.04]', 'text-slate-400');
+      quickBiteBtn?.classList.add('border-rose-400/50', 'bg-rose-500/15', 'text-rose-300', 'animate-pulse');
       if (biteText) {
         biteText.textContent = controlled?.type === 'shark' ? 'KILL FISH!' : 'BITE FOOD!';
       }
     } else {
-      quickBiteBtn?.classList.add('border-slate-700', 'bg-slate-900', 'text-slate-400');
-      quickBiteBtn?.classList.remove('border-rose-500', 'bg-rose-950', 'text-rose-300', 'animate-pulse');
+      quickBiteBtn?.classList.add('border-white/10', 'bg-white/[0.04]', 'text-slate-400');
+      quickBiteBtn?.classList.remove('border-rose-400/50', 'bg-rose-500/15', 'text-rose-300', 'animate-pulse');
       if (biteText) {
         biteText.textContent = 'Bite';
       }

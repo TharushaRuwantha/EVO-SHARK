@@ -80,472 +80,445 @@ export class ActorShowcase {
 
   private renderDOM(): void {
     this.container.innerHTML = `
-      <div class="w-full h-full flex flex-col bg-[#020713] text-slate-100 font-sans select-none overflow-hidden">
-        
+      <div class="w-full h-full flex flex-col bg-[#050b16] text-slate-100 font-sans select-none overflow-hidden">
+
         <!-- ================= TOP HEADER ================= -->
-        <header class="flex items-center justify-between px-6 sm:px-10 py-4 border-b border-cyan-950/80 bg-slate-950/95 backdrop-blur-md shrink-0 z-20">
-          <div class="flex items-center gap-3.5">
-            <div class="w-10 h-10 rounded-xl bg-cyan-950 border border-cyan-500/50 flex items-center justify-center text-xl shadow-md">
+        <header class="flex flex-wrap items-center justify-between gap-4 px-6 sm:px-10 py-5 border-b border-white/[0.06] bg-slate-950/70 backdrop-blur-md shrink-0 z-20">
+          <div class="flex items-center gap-4">
+            <div class="w-11 h-11 rounded-2xl bg-cyan-500/10 border border-cyan-400/20 flex items-center justify-center text-xl">
               🌊
             </div>
             <div>
-              <div class="flex items-center gap-2">
-                <h1 class="text-xl sm:text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-cyan-200 to-teal-300">
-                  MENU
-                </h1>
-                <span class="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-500/40 text-[10px] text-cyan-300 font-mono">
-                  ACTORS & GUIDE
-                </span>
-              </div>
-              <p class="text-xs text-slate-400 hidden sm:block">
-                Click any actor to inspect live playing animation, biological details, and launch controls
+              <h1 class="text-lg sm:text-xl font-bold tracking-tight text-slate-50">
+                Ocean Simulation
+              </h1>
+              <p class="text-xs text-slate-400 mt-0.5 hidden sm:block">
+                Choose an actor to preview its behavior, then launch a session below
               </p>
             </div>
           </div>
 
-          <div class="flex items-center gap-3">
-            <button id="menu-btn-pilot-shark-top" class="px-3.5 py-1.5 rounded-xl bg-sky-950/90 border border-sky-500/60 hover:bg-sky-900 text-sky-200 text-xs font-bold transition cursor-pointer shadow">
-              <span>🦈</span> Pilot Shark
+          <div class="flex items-center gap-2.5">
+            <button id="menu-btn-pilot-shark-top" class="px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.07] hover:border-sky-400/40 text-slate-300 hover:text-sky-200 text-xs font-medium transition-all duration-150 cursor-pointer">
+              🦈 Pilot Shark
             </button>
-            <button id="menu-btn-pilot-fish-top" class="px-3.5 py-1.5 rounded-xl bg-amber-950/90 border border-amber-500/60 hover:bg-amber-900 text-amber-200 text-xs font-bold transition cursor-pointer shadow">
-              <span>🐟</span> Pilot Fish
+            <button id="menu-btn-pilot-fish-top" class="px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.07] hover:border-amber-400/40 text-slate-300 hover:text-amber-200 text-xs font-medium transition-all duration-150 cursor-pointer">
+              🐟 Pilot Fish
             </button>
-            <button id="menu-btn-free-arena" title="Open an independent copy of the simulation for separate testing" class="px-3.5 py-1.5 rounded-xl bg-violet-950/90 border border-violet-500/60 hover:bg-violet-900 text-violet-200 text-xs font-bold transition cursor-pointer shadow">
-              <span>🧪</span> Free Test Arena
+            <div class="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
+            <button id="menu-btn-free-arena" title="Open an independent copy of the simulation for separate testing" class="px-3.5 py-2 rounded-xl bg-violet-500/10 border border-violet-400/30 hover:bg-violet-500/20 text-violet-200 text-xs font-semibold transition-all duration-150 cursor-pointer">
+              🧪 Free Test Arena
             </button>
-            <button id="menu-btn-enter-sim" class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 via-teal-500 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-black tracking-wider transition cursor-pointer shadow-lg shadow-cyan-950 hover:scale-[1.03]">
-              <span>🌊</span> DIVE INTO OCEAN
+            <button id="menu-btn-enter-sim" class="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition-all duration-150 cursor-pointer shadow-lg shadow-cyan-500/20">
+              🌊 Dive Into Ocean
             </button>
           </div>
         </header>
 
         <!-- ================= MAIN MENU BODY: SPLIT VIEW (LIST + DETAILS) ================= -->
         <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
-          
-          <!-- LEFT COLUMN: ACTOR LIST WITH ANIMATED CIRCLES (MATCHING USER SKETCH) -->
-          <div class="w-full md:w-96 lg:w-[420px] bg-slate-950/60 border-r border-cyan-950/80 p-5 sm:p-7 flex flex-col gap-3.5 overflow-y-auto shrink-0">
-            <div class="text-[11px] font-mono uppercase text-slate-500 tracking-widest pb-1 flex items-center justify-between">
-              <span>Select Actor to View:</span>
-              <span class="text-cyan-400">Live 60 FPS</span>
+
+          <!-- LEFT COLUMN: ACTOR LIST -->
+          <div class="w-full md:w-[360px] lg:w-[400px] border-r border-white/[0.06] p-6 flex flex-col gap-3 overflow-y-auto shrink-0">
+            <div class="text-[11px] font-medium uppercase text-slate-500 tracking-wider pb-2 flex items-center justify-between">
+              <span>Actors</span>
+              <span class="text-slate-600 normal-case">Live preview</span>
             </div>
 
-            <!-- 1. SHARK (Blue Circle + Shark Title) -->
-            <button id="actor-item-shark" class="actor-menu-item group w-full p-3.5 rounded-2xl border-2 border-sky-500/80 bg-sky-950/30 flex items-center gap-4 text-left transition cursor-pointer shadow-lg hover:bg-sky-950/50">
-              <!-- Blue Circle from sketch -->
-              <div class="relative w-16 h-16 sm:w-18 sm:h-18 rounded-full border-3 border-sky-400 bg-slate-950 shadow-md shadow-sky-900/50 overflow-hidden flex items-center justify-center shrink-0">
+            <!-- 1. SHARK -->
+            <button id="actor-item-shark" class="actor-menu-item group w-full p-4 rounded-2xl border border-sky-400/50 bg-sky-400/[0.07] flex items-center gap-4 text-left transition-all duration-150 cursor-pointer">
+              <div class="relative w-14 h-14 rounded-full bg-slate-950/60 ring-1 ring-sky-400/30 overflow-hidden flex items-center justify-center shrink-0">
                 <canvas id="icon-canvas-shark" width="80" height="80" class="w-full h-full block"></canvas>
               </div>
               <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <h2 class="text-xl sm:text-2xl font-black text-sky-400 group-hover:text-sky-300 tracking-wide">
+                <div class="flex items-center justify-between gap-2">
+                  <h2 class="text-base font-semibold text-slate-100">
                     Shark
                   </h2>
-                  <span class="text-[10px] font-mono text-sky-300/80 bg-sky-950 px-2 py-0.5 rounded border border-sky-500/40">1 Apex</span>
+                  <span class="text-[10px] text-sky-300/70 shrink-0">1 apex</span>
                 </div>
-                <p class="text-xs text-slate-300 truncate mt-0.5">Predator · Space to Chomp & Kill</p>
+                <p class="text-xs text-slate-400 truncate mt-0.5">Predator · Space to chomp & kill</p>
               </div>
             </button>
 
-            <!-- 2. S FISH (Orange Circle + S Fish Title) -->
-            <button id="actor-item-fish" class="actor-menu-item group w-full p-3.5 rounded-2xl border-2 border-slate-800 bg-slate-900/40 hover:border-amber-500/80 flex items-center gap-4 text-left transition cursor-pointer shadow-lg hover:bg-amber-950/30">
-              <!-- Orange Circle from sketch -->
-              <div class="relative w-16 h-16 sm:w-18 sm:h-18 rounded-full border-3 border-amber-400 bg-slate-950 shadow-md shadow-amber-900/50 overflow-hidden flex items-center justify-center shrink-0">
+            <!-- 2. S FISH -->
+            <button id="actor-item-fish" class="actor-menu-item group w-full p-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] flex items-center gap-4 text-left transition-all duration-150 cursor-pointer">
+              <div class="relative w-14 h-14 rounded-full bg-slate-950/60 ring-1 ring-white/10 overflow-hidden flex items-center justify-center shrink-0">
                 <canvas id="icon-canvas-fish" width="80" height="80" class="w-full h-full block"></canvas>
               </div>
               <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <h2 class="text-xl sm:text-2xl font-black text-amber-400 group-hover:text-amber-300 tracking-wide">
-                    S Fish
+                <div class="flex items-center justify-between gap-2">
+                  <h2 class="text-base font-semibold text-slate-100">
+                    Small Fish
                   </h2>
-                  <span class="text-[10px] font-mono text-amber-300/80 bg-amber-950 px-2 py-0.5 rounded border border-amber-500/40">20 Alive</span>
+                  <span class="text-[10px] text-amber-300/70 shrink-0">20 alive</span>
                 </div>
-                <p class="text-xs text-slate-300 truncate mt-0.5">Small Forager · Hides under plants</p>
+                <p class="text-xs text-slate-400 truncate mt-0.5">Forager · Hides under plants</p>
               </div>
             </button>
 
-            <!-- 3. PLANT (Green Circle + Plant Title) -->
-            <button id="actor-item-plant" class="actor-menu-item group w-full p-3.5 rounded-2xl border-2 border-slate-800 bg-slate-900/40 hover:border-emerald-500/80 flex items-center gap-4 text-left transition cursor-pointer shadow-lg hover:bg-emerald-950/30">
-              <!-- Green Circle from sketch -->
-              <div class="relative w-16 h-16 sm:w-18 sm:h-18 rounded-full border-3 border-emerald-400 bg-slate-950 shadow-md shadow-emerald-900/50 overflow-hidden flex items-center justify-center shrink-0">
+            <!-- 3. PLANT -->
+            <button id="actor-item-plant" class="actor-menu-item group w-full p-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] flex items-center gap-4 text-left transition-all duration-150 cursor-pointer">
+              <div class="relative w-14 h-14 rounded-full bg-slate-950/60 ring-1 ring-white/10 overflow-hidden flex items-center justify-center shrink-0">
                 <canvas id="icon-canvas-plant" width="80" height="80" class="w-full h-full block"></canvas>
               </div>
               <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <h2 class="text-xl sm:text-2xl font-black text-emerald-400 group-hover:text-emerald-300 tracking-wide">
+                <div class="flex items-center justify-between gap-2">
+                  <h2 class="text-base font-semibold text-slate-100">
                     Plant
                   </h2>
-                  <span id="label-plant-count" class="text-[10px] font-mono text-emerald-300/80 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/40">Flora</span>
+                  <span id="label-plant-count" class="text-[10px] text-emerald-300/70 shrink-0">Flora</span>
                 </div>
-                <p class="text-xs text-slate-300 truncate mt-0.5">Bioluminescent · Provides Camouflage</p>
+                <p class="text-xs text-slate-400 truncate mt-0.5">Bioluminescent · Provides camouflage</p>
               </div>
             </button>
 
-            <!-- 4. FISH REMAINS (Red Circle + Meat Title) -->
-            <button id="actor-item-meat" class="actor-menu-item group w-full p-3.5 rounded-2xl border-2 border-slate-800 bg-slate-900/40 hover:border-rose-500/80 flex items-center gap-4 text-left transition cursor-pointer shadow-lg hover:bg-rose-950/30">
-              <!-- Red Circle -->
-              <div class="relative w-16 h-16 sm:w-18 sm:h-18 rounded-full border-3 border-rose-500 bg-slate-950 shadow-md shadow-rose-900/50 overflow-hidden flex items-center justify-center shrink-0">
+            <!-- 4. FISH REMAINS -->
+            <button id="actor-item-meat" class="actor-menu-item group w-full p-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] flex items-center gap-4 text-left transition-all duration-150 cursor-pointer">
+              <div class="relative w-14 h-14 rounded-full bg-slate-950/60 ring-1 ring-white/10 overflow-hidden flex items-center justify-center shrink-0">
                 <canvas id="icon-canvas-meat" width="80" height="80" class="w-full h-full block"></canvas>
               </div>
               <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <h2 class="text-xl sm:text-2xl font-black text-rose-400 group-hover:text-rose-300 tracking-wide">
+                <div class="flex items-center justify-between gap-2">
+                  <h2 class="text-base font-semibold text-slate-100">
                     Fish Remains
                   </h2>
-                  <span class="text-[10px] font-mono text-rose-300/80 bg-rose-950 px-2 py-0.5 rounded border border-rose-500/40">Meat</span>
+                  <span class="text-[10px] text-rose-300/70 shrink-0">Meat</span>
                 </div>
-                <p class="text-xs text-slate-300 truncate mt-0.5">Dropped on death · Scavenged by all</p>
+                <p class="text-xs text-slate-400 truncate mt-0.5">Dropped on death · Scavenged by all</p>
               </div>
             </button>
 
-            <!-- 5. REEF ROCKS (Slate Circle + Obstacle Title) -->
-            <button id="actor-item-obstacle" class="actor-menu-item group w-full p-3.5 rounded-2xl border-2 border-slate-800 bg-slate-900/40 hover:border-slate-400 flex items-center gap-4 text-left transition cursor-pointer shadow-lg hover:bg-slate-900/80">
-              <!-- Slate Circle -->
-              <div class="relative w-16 h-16 sm:w-18 sm:h-18 rounded-full border-3 border-slate-400 bg-slate-950 shadow-md overflow-hidden flex items-center justify-center shrink-0">
+            <!-- 5. REEF ROCKS -->
+            <button id="actor-item-obstacle" class="actor-menu-item group w-full p-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] flex items-center gap-4 text-left transition-all duration-150 cursor-pointer">
+              <div class="relative w-14 h-14 rounded-full bg-slate-950/60 ring-1 ring-white/10 overflow-hidden flex items-center justify-center shrink-0">
                 <canvas id="icon-canvas-obstacle" width="80" height="80" class="w-full h-full block"></canvas>
               </div>
               <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <h2 class="text-xl sm:text-2xl font-black text-slate-300 group-hover:text-white tracking-wide">
+                <div class="flex items-center justify-between gap-2">
+                  <h2 class="text-base font-semibold text-slate-100">
                     Reef Rock
                   </h2>
-                  <span class="text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">Barrier</span>
+                  <span class="text-[10px] text-slate-400 shrink-0">Barrier</span>
                 </div>
                 <p class="text-xs text-slate-400 truncate mt-0.5">Solid formation · Blocks line of sight</p>
               </div>
             </button>
           </div>
 
-          <!-- RIGHT COLUMN: ACTOR DETAILS VIEW ("DETAILS SORT OF A VIEW") -->
-          <div class="flex-1 p-6 sm:p-8 overflow-y-auto bg-gradient-to-b from-[#030919] to-[#01050e]">
-            
+          <!-- RIGHT COLUMN: ACTOR DETAILS VIEW -->
+          <div class="flex-1 p-8 sm:p-12 overflow-y-auto">
+
             <!-- DETAIL 1: SHARK DETAILS -->
-            <div id="detail-panel-shark" class="actor-detail-panel flex flex-col gap-6 max-w-4xl mx-auto">
-              <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-sky-950">
-                <div class="flex items-center gap-3">
+            <div id="detail-panel-shark" class="actor-detail-panel flex flex-col gap-8 max-w-3xl mx-auto">
+              <div class="flex flex-wrap items-center justify-between gap-5">
+                <div class="flex items-center gap-4">
                   <span class="text-3xl">🦈</span>
                   <div>
-                    <h3 class="text-2xl font-black text-sky-300">The Shark (Apex Predator)</h3>
-                    <p class="text-xs text-sky-400 font-mono">1 IN OCEAN · APEX HUNTER · CONTROLLABLE [KEY 1]</p>
+                    <h3 class="text-xl font-bold text-slate-50">The Shark</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Apex predator · controllable with key 1</p>
                   </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <button id="btn-detail-shark-bite" class="px-3.5 py-1.5 rounded-xl bg-rose-950/80 border border-rose-500/60 hover:bg-rose-900 text-rose-300 text-xs font-bold cursor-pointer transition shadow">
-                    💥 Test Chomp (Space)
+                <div class="flex items-center gap-2.5">
+                  <button id="btn-detail-shark-bite" class="px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.07] text-slate-300 text-xs font-medium cursor-pointer transition-all duration-150">
+                    💥 Test Chomp
                   </button>
-                  <button id="btn-detail-pilot-shark" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs cursor-pointer transition shadow-lg shadow-sky-950">
-                    🦈 PILOT SHARK IN OCEAN
+                  <button id="btn-detail-pilot-shark" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs cursor-pointer transition-all duration-150 shadow-lg shadow-sky-500/20">
+                    Pilot Shark →
                   </button>
                 </div>
               </div>
 
               <!-- Live Preview Stage -->
-              <div class="relative w-full h-64 sm:h-72 bg-radial from-slate-900 to-[#020713] rounded-2xl border border-sky-950/80 flex items-center justify-center overflow-hidden shadow-2xl">
+              <div class="relative w-full h-64 sm:h-72 bg-slate-950/40 rounded-3xl border border-white/[0.06] flex items-center justify-center overflow-hidden">
                 <canvas id="canvas-shark-preview" class="w-full h-full"></canvas>
-                <div class="absolute bottom-3 right-4 text-[10px] text-sky-400/80 font-mono">
-                  LIVE 60 FPS · REALTIME JAW & TAIL PHYSICS
+                <div class="absolute bottom-4 right-5 text-[10px] tracking-wide text-slate-500">
+                  LIVE · JAW & TAIL PHYSICS
                 </div>
               </div>
 
               <!-- Must Bite Notice -->
-              <div class="p-3.5 rounded-2xl bg-rose-950/30 border border-rose-800/50 flex items-start gap-3 text-xs">
-                <span class="text-2xl">💥</span>
-                <div>
-                  <strong class="text-rose-300 font-bold block text-sm">Must Bite to Kill (Spacebar):</strong>
-                  <p class="text-slate-300 mt-1 leading-relaxed">
-                    Simply swimming into small fish does not kill them. The shark <span class="text-rose-400 font-semibold">must press Space</span> when in range to chomp. When a bite connects, the small fish is killed instantly and explodes into <span class="text-amber-300 font-semibold">3 drifting meat chunks</span>!
-                  </p>
-                </div>
+              <div class="p-4 rounded-2xl bg-rose-500/[0.06] border border-rose-400/15 flex items-start gap-4 text-sm">
+                <span class="text-xl mt-0.5">💥</span>
+                <p class="text-slate-300 leading-relaxed">
+                  <strong class="text-rose-300 font-semibold">Must bite to kill.</strong> Simply swimming into small fish does not kill them — the shark must press <span class="text-rose-300 font-medium">Space</span> when in range to chomp. A connected bite kills instantly and drops 3 drifting meat chunks.
+                </p>
               </div>
 
               <!-- Specs Table -->
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">SPEED / THRUST</span>
-                  <span class="font-bold text-sky-300 text-sm">190 u/s · 350 u/s²</span>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Speed / Thrust</span>
+                  <span class="font-semibold text-slate-100 text-sm">190 u/s · 350 u/s²</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">PREY SOURCE</span>
-                  <span class="font-bold text-amber-300 text-sm">Small Fish & Meat</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Prey Source</span>
+                  <span class="font-semibold text-slate-100 text-sm">Small fish & meat</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">CLONING GOAL</span>
-                  <span class="font-bold text-cyan-300 text-sm">Eat 2 Foods -> Clone</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Cloning Goal</span>
+                  <span class="font-semibold text-slate-100 text-sm">Eat 2 foods</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">RADIUS / MASS</span>
-                  <span class="font-bold text-slate-300 text-sm">14 u / 2.5 kg</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Radius / Mass</span>
+                  <span class="font-semibold text-slate-100 text-sm">14 u / 2.5 kg</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">CONTROLS</span>
-                  <span class="font-bold text-sky-300 text-sm">W/A/S/D or Arrows</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Controls</span>
+                  <span class="font-semibold text-slate-100 text-sm">W/A/S/D or arrows</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">CHOMP HOTKEY</span>
-                  <span class="font-bold text-rose-400 text-sm">SPACEBAR</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Chomp Hotkey</span>
+                  <span class="font-semibold text-slate-100 text-sm">Spacebar</span>
                 </div>
               </div>
             </div>
 
             <!-- DETAIL 2: SMALL FISH DETAILS -->
-            <div id="detail-panel-fish" class="actor-detail-panel hidden flex flex-col gap-6 max-w-4xl mx-auto">
-              <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-amber-950">
-                <div class="flex items-center gap-3">
+            <div id="detail-panel-fish" class="actor-detail-panel hidden flex flex-col gap-8 max-w-3xl mx-auto">
+              <div class="flex flex-wrap items-center justify-between gap-5">
+                <div class="flex items-center gap-4">
                   <span class="text-3xl">🐟</span>
                   <div>
-                    <h3 class="text-2xl font-black text-amber-300">Small Fish (S Fish)</h3>
-                    <p class="text-xs text-amber-400 font-mono">20 AT START · FORAGER · CONTROLLABLE [KEY 2]</p>
+                    <h3 class="text-xl font-bold text-slate-50">Small Fish</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Forager · controllable with key 2</p>
                   </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <button id="btn-detail-fish-nibble" class="px-3.5 py-1.5 rounded-xl bg-amber-950/80 border border-amber-500/60 hover:bg-amber-900 text-amber-300 text-xs font-bold cursor-pointer transition shadow">
-                    🌿 Test Nibble (Space)
+                <div class="flex items-center gap-2.5">
+                  <button id="btn-detail-fish-nibble" class="px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.07] text-slate-300 text-xs font-medium cursor-pointer transition-all duration-150">
+                    🌿 Test Nibble
                   </button>
-                  <button id="btn-detail-pilot-fish" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer transition shadow-lg shadow-amber-950">
-                    🐟 PILOT SMALL FISH
+                  <button id="btn-detail-pilot-fish" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs cursor-pointer transition-all duration-150 shadow-lg shadow-amber-500/20">
+                    Pilot Fish →
                   </button>
                 </div>
               </div>
 
               <!-- Live Preview Stage -->
-              <div class="relative w-full h-64 sm:h-72 bg-radial from-slate-900 to-[#020713] rounded-2xl border border-amber-950/80 flex items-center justify-center overflow-hidden shadow-2xl">
+              <div class="relative w-full h-64 sm:h-72 bg-slate-950/40 rounded-3xl border border-white/[0.06] flex items-center justify-center overflow-hidden">
                 <canvas id="canvas-fish-preview" class="w-full h-full"></canvas>
-                <div class="absolute bottom-3 right-4 text-[10px] text-amber-400/80 font-mono">
-                  LIVE 60 FPS · UNDULATING CAUDAL FIN & MOUTH
+                <div class="absolute bottom-4 right-5 text-[10px] tracking-wide text-slate-500">
+                  LIVE · CAUDAL FIN & MOUTH
                 </div>
               </div>
 
               <!-- Camouflage & Still Notice -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div class="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-800/50 flex items-start gap-3">
-                  <span class="text-2xl">🌿</span>
-                  <div>
-                    <strong class="text-emerald-300 font-bold block">Flora Camouflage:</strong>
-                    <p class="text-slate-300 mt-1 leading-relaxed">
-                      Layers under marine plants. When inside foliage, the shark's targeting lock range drops by <span class="text-emerald-300 font-bold">65%</span>, making fish virtually invisible!
-                    </p>
-                  </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="p-4 rounded-2xl bg-emerald-500/[0.06] border border-emerald-400/15 flex items-start gap-3 text-sm">
+                  <span class="text-xl mt-0.5">🌿</span>
+                  <p class="text-slate-300 leading-relaxed">
+                    <strong class="text-emerald-300 font-semibold">Flora camouflage.</strong> Inside foliage, a shark's targeting range drops by 65% — fish become nearly invisible.
+                  </p>
                 </div>
-                <div class="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-800/50 flex items-start gap-3">
-                  <span class="text-2xl">🛑</span>
-                  <div>
-                    <strong class="text-amber-300 font-bold block">Motion Only on Press:</strong>
-                    <p class="text-slate-300 mt-1 leading-relaxed">
-                      Fish remain completely stationary until piloted with <kbd class="px-1 rounded bg-slate-900 text-cyan-300">W/A/S/D</kbd>. Zero random drift—clean for AI development.
-                    </p>
-                  </div>
+                <div class="p-4 rounded-2xl bg-amber-500/[0.06] border border-amber-400/15 flex items-start gap-3 text-sm">
+                  <span class="text-xl mt-0.5">🛑</span>
+                  <p class="text-slate-300 leading-relaxed">
+                    <strong class="text-amber-300 font-semibold">Still until piloted.</strong> Fish stay stationary until moved with <kbd class="px-1.5 py-0.5 rounded bg-white/10 text-slate-200 text-xs">W/A/S/D</kbd> — no random drift.
+                  </p>
                 </div>
               </div>
 
               <!-- Specs Table -->
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">SPEED / THRUST</span>
-                  <span class="font-bold text-amber-300 text-sm">220 u/s · 420 u/s² (Agile)</span>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Speed / Thrust</span>
+                  <span class="font-semibold text-slate-100 text-sm">220 u/s · 420 u/s²</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">START POPULATION</span>
-                  <span class="font-bold text-emerald-300 text-sm">20 Small Fish</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Start Population</span>
+                  <span class="font-semibold text-slate-100 text-sm">20 small fish</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">CLONING THRESHOLD</span>
-                  <span class="font-bold text-amber-300 text-sm">Eat 3 Foods -> Clone</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Cloning Threshold</span>
+                  <span class="font-semibold text-slate-100 text-sm">Eat 3 foods</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">DIET</span>
-                  <span class="font-bold text-emerald-300 text-sm">Plants & Meat Remains</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Diet</span>
+                  <span class="font-semibold text-slate-100 text-sm">Plants & meat</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">FEEDING ACTION</span>
-                  <span class="font-bold text-rose-300 text-sm">Space to Bite</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Feeding Action</span>
+                  <span class="font-semibold text-slate-100 text-sm">Space to bite</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">CYCLE HOTKEY</span>
-                  <span class="font-bold text-amber-300 text-sm">TAB or KEY 2</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Cycle Hotkey</span>
+                  <span class="font-semibold text-slate-100 text-sm">Tab or key 2</span>
                 </div>
               </div>
             </div>
 
             <!-- DETAIL 3: PLANT DETAILS -->
-            <div id="detail-panel-plant" class="actor-detail-panel hidden flex flex-col gap-6 max-w-4xl mx-auto">
-              <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-emerald-950">
-                <div class="flex items-center gap-3">
+            <div id="detail-panel-plant" class="actor-detail-panel hidden flex flex-col gap-8 max-w-3xl mx-auto">
+              <div class="flex flex-wrap items-center justify-between gap-5">
+                <div class="flex items-center gap-4">
                   <span class="text-3xl">🌿</span>
                   <div>
-                    <h3 class="text-2xl font-black text-emerald-300">Marine Flora (Plant)</h3>
-                    <p class="text-xs text-emerald-400 font-mono">BIOLUMINESCENT PRODUCER · PROPAGATES EVERY 4s</p>
+                    <h3 class="text-xl font-bold text-slate-50">Marine Flora</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Bioluminescent · propagates every 4s</p>
                   </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <button id="btn-detail-burst-plant" class="px-3.5 py-1.5 rounded-xl bg-teal-950/80 border border-teal-500/60 hover:bg-teal-900 text-teal-300 text-xs font-bold cursor-pointer transition shadow">
-                    ✨ Burst (+30)
+                <div class="flex items-center gap-2.5">
+                  <button id="btn-detail-burst-plant" class="px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.07] text-slate-300 text-xs font-medium cursor-pointer transition-all duration-150">
+                    ✨ Burst +30
                   </button>
-                  <button id="btn-detail-regen-plant" class="px-3.5 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/60 hover:bg-emerald-900 text-emerald-300 text-xs font-bold cursor-pointer transition shadow">
-                    🌱 Regenerate (E)
+                  <button id="btn-detail-regen-plant" class="px-4 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs cursor-pointer transition-all duration-150 shadow-lg shadow-emerald-500/20">
+                    🌱 Regenerate
                   </button>
                 </div>
               </div>
 
               <!-- Live Preview Stage -->
-              <div class="relative w-full h-64 sm:h-72 bg-radial from-slate-900 to-[#020713] rounded-2xl border border-emerald-950/80 flex items-center justify-center overflow-hidden shadow-2xl">
+              <div class="relative w-full h-64 sm:h-72 bg-slate-950/40 rounded-3xl border border-white/[0.06] flex items-center justify-center overflow-hidden">
                 <canvas id="canvas-plant-preview" class="w-full h-full"></canvas>
-                <div id="plant-active-count-badge" class="absolute top-3 left-4 text-xs bg-slate-900/90 px-2.5 py-1 rounded-md border border-emerald-500/40 text-emerald-300 font-mono">
-                  Active Flora: <span id="plant-active-count" class="font-bold text-emerald-200">0</span>
+                <div id="plant-active-count-badge" class="absolute top-4 left-5 text-xs bg-slate-950/70 px-3 py-1.5 rounded-full border border-white/10 text-slate-300">
+                  Active flora: <span id="plant-active-count" class="font-semibold text-emerald-300">0</span>
                 </div>
-                <div class="absolute bottom-3 right-4 text-[10px] text-emerald-400/80 font-mono">
-                  LIVE 60 FPS · CURRENT FLOW & BULB BLOOM
+                <div class="absolute bottom-4 right-5 text-[10px] tracking-wide text-slate-500">
+                  LIVE · CURRENT FLOW & BLOOM
                 </div>
               </div>
 
               <!-- Camouflage Feature Banner -->
-              <div class="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-800/50 flex items-start gap-3 text-xs">
-                <span class="text-2xl">🌿</span>
-                <div>
-                  <strong class="text-emerald-300 font-bold block text-sm">Under-Plant Layering & Shark Camouflage:</strong>
-                  <p class="text-slate-300 mt-1 leading-relaxed">
-                    Plants are rendered directly above small fish. When a fish hides under the foliage, its opacity dims and the shark cannot target or chomp it from outside the foliage—the predator must swim right into the plant to detect the fish!
-                  </p>
-                </div>
+              <div class="p-4 rounded-2xl bg-emerald-500/[0.06] border border-emerald-400/15 flex items-start gap-4 text-sm">
+                <span class="text-xl mt-0.5">🌿</span>
+                <p class="text-slate-300 leading-relaxed">
+                  <strong class="text-emerald-300 font-semibold">Camouflage layer.</strong> Plants render above small fish; hidden fish dim and can't be targeted from outside the foliage — a shark has to swim right into it to find them.
+                </p>
               </div>
 
               <!-- Specs Table -->
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">SPAWN INTERVAL</span>
-                  <span class="font-bold text-emerald-300 text-sm">Every 4.0 Seconds</span>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Spawn Interval</span>
+                  <span class="font-semibold text-slate-100 text-sm">Every 4.0s</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">NUTRITION</span>
-                  <span class="font-bold text-emerald-300 text-sm">+25 Energy (1/3 Clone)</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Nutrition</span>
+                  <span class="font-semibold text-slate-100 text-sm">+25 energy</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">EATING CONDITION</span>
-                  <span class="font-bold text-amber-300 text-sm">Must Bite (Space)</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Eating Condition</span>
+                  <span class="font-semibold text-slate-100 text-sm">Must bite</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">COVER RADIUS</span>
-                  <span class="font-bold text-cyan-300 text-sm">24 Units</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Cover Radius</span>
+                  <span class="font-semibold text-slate-100 text-sm">24 units</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">PREDATOR REDUCTION</span>
-                  <span class="font-bold text-rose-300 text-sm">65% Bite Range Drop</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Predator Reduction</span>
+                  <span class="font-semibold text-slate-100 text-sm">65% range drop</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                  <span class="text-slate-500 block text-[10px]">RESET CLEAR</span>
-                  <button id="btn-clear-plants" class="text-rose-400 hover:text-rose-300 underline font-bold cursor-pointer">Clear All</button>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06] flex items-center justify-between">
+                  <span class="text-slate-500 text-[11px]">Reset</span>
+                  <button id="btn-clear-plants" class="text-rose-300 hover:text-rose-200 text-sm font-medium cursor-pointer">Clear all</button>
                 </div>
               </div>
             </div>
 
             <!-- DETAIL 4: FISH REMAINS DETAILS -->
-            <div id="detail-panel-meat" class="actor-detail-panel hidden flex flex-col gap-6 max-w-4xl mx-auto">
-              <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-rose-950">
-                <div class="flex items-center gap-3">
+            <div id="detail-panel-meat" class="actor-detail-panel hidden flex flex-col gap-8 max-w-3xl mx-auto">
+              <div class="flex flex-wrap items-center justify-between gap-5">
+                <div class="flex items-center gap-4">
                   <span class="text-3xl">🥩</span>
                   <div>
-                    <h3 class="text-2xl font-black text-rose-300">Fish Remains (Meat Chunks)</h3>
-                    <p class="text-xs text-rose-400 font-mono">CARCASS SCAVENGING · SPAWNED ON SHARK KILL</p>
+                    <h3 class="text-xl font-bold text-slate-50">Fish Remains</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Spawned on shark kill · scavenged by all</p>
                   </div>
                 </div>
-                <span class="px-3.5 py-1.5 rounded-xl bg-rose-950/80 border border-rose-700/50 text-rose-300 text-xs font-mono font-bold">
-                  🥩 Nutritious Morsels
-                </span>
               </div>
 
               <!-- Live Preview Stage -->
-              <div class="relative w-full h-64 sm:h-72 bg-radial from-slate-900 to-[#020713] rounded-2xl border border-rose-950/80 flex items-center justify-center overflow-hidden shadow-2xl">
+              <div class="relative w-full h-64 sm:h-72 bg-slate-950/40 rounded-3xl border border-white/[0.06] flex items-center justify-center overflow-hidden">
                 <canvas id="canvas-meat-preview" class="w-full h-full"></canvas>
-                <div class="absolute bottom-3 right-4 text-[10px] text-rose-400/80 font-mono">
-                  LIVE 60 FPS · BUOYANCY & DRIFT PHYSICS
+                <div class="absolute bottom-4 right-5 text-[10px] tracking-wide text-slate-500">
+                  LIVE · BUOYANCY & DRIFT
                 </div>
               </div>
 
               <!-- Scavenging Banner -->
-              <div class="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-800/50 flex items-start gap-3 text-xs">
-                <span class="text-2xl">🥩</span>
-                <div>
-                  <strong class="text-amber-300 font-bold block text-sm">Nutritious Food for Both Shark & Small Fish:</strong>
-                  <p class="text-slate-300 mt-1 leading-relaxed">
-                    Whenever a shark bites and kills a small fish, 3 pieces of meat explode outwards. Both sharks (+50 clone pts) and small fish (+40 clone pts) can bite and scavenge these remains!
-                  </p>
-                </div>
+              <div class="p-4 rounded-2xl bg-amber-500/[0.06] border border-amber-400/15 flex items-start gap-4 text-sm">
+                <span class="text-xl mt-0.5">🥩</span>
+                <p class="text-slate-300 leading-relaxed">
+                  <strong class="text-amber-300 font-semibold">Nutritious for both.</strong> Killing a small fish drops 3 chunks of meat. Sharks (+50 pts) and small fish (+40 pts) can both scavenge them toward cloning.
+                </p>
               </div>
 
               <!-- Specs Table -->
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">ORIGIN</span>
-                  <span class="font-bold text-rose-300 text-sm">Shark Kills Small Fish</span>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Origin</span>
+                  <span class="font-semibold text-slate-100 text-sm">Shark kills fish</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">CHUNKS SPAWNED</span>
-                  <span class="font-bold text-rose-300 text-sm">3 Chunks per Kill</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Chunks Spawned</span>
+                  <span class="font-semibold text-slate-100 text-sm">3 per kill</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">CONSUMABLE BY</span>
-                  <span class="font-bold text-amber-300 text-sm">Both Shark & Fish</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Consumable By</span>
+                  <span class="font-semibold text-slate-100 text-sm">Shark & fish</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">SHARK VALUE</span>
-                  <span class="font-bold text-rose-400 text-sm">+50 pts (1/2 Clone)</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Shark Value</span>
+                  <span class="font-semibold text-slate-100 text-sm">+50 pts (1/2 clone)</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">FISH VALUE</span>
-                  <span class="font-bold text-amber-400 text-sm">+40 pts (1/3 Clone)</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Fish Value</span>
+                  <span class="font-semibold text-slate-100 text-sm">+40 pts (1/3 clone)</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">DECAY TIME</span>
-                  <span class="font-bold text-slate-400 text-sm">50 Seconds</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Decay Time</span>
+                  <span class="font-semibold text-slate-100 text-sm">50 seconds</span>
                 </div>
               </div>
             </div>
 
             <!-- DETAIL 5: REEF OBSTACLE DETAILS -->
-            <div id="detail-panel-obstacle" class="actor-detail-panel hidden flex flex-col gap-6 max-w-4xl mx-auto">
-              <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
-                <div class="flex items-center gap-3">
+            <div id="detail-panel-obstacle" class="actor-detail-panel hidden flex flex-col gap-8 max-w-3xl mx-auto">
+              <div class="flex flex-wrap items-center justify-between gap-5">
+                <div class="flex items-center gap-4">
                   <span class="text-3xl">🪨</span>
                   <div>
-                    <h3 class="text-2xl font-black text-slate-200">Reef Formations (Rock Barriers)</h3>
-                    <p class="text-xs text-slate-400 font-mono">SOLID BARRIER · SMOOTH SLIDE COLLISION · BLOCKS VISION</p>
+                    <h3 class="text-xl font-bold text-slate-50">Reef Formations</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Solid barrier · blocks line of sight</p>
                   </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-                    <button id="btn-rock-small" class="px-3 py-1 rounded-lg text-slate-400 border border-transparent hover:text-white transition cursor-pointer">Small</button>
-                    <button id="btn-rock-medium" class="px-3 py-1 rounded-lg border border-cyan-500 bg-cyan-950 text-cyan-300 transition cursor-pointer">Medium</button>
-                    <button id="btn-rock-large" class="px-3 py-1 rounded-lg text-slate-400 border border-transparent hover:text-white transition cursor-pointer">Large</button>
+                <div class="flex items-center gap-2.5">
+                  <div class="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/10 text-xs">
+                    <button id="btn-rock-small" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-colors duration-150 cursor-pointer">Small</button>
+                    <button id="btn-rock-medium" class="px-3 py-1.5 rounded-lg bg-cyan-500/15 text-cyan-300 transition-colors duration-150 cursor-pointer">Medium</button>
+                    <button id="btn-rock-large" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-colors duration-150 cursor-pointer">Large</button>
                   </div>
-                  <button id="btn-rock-new" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer transition">
+                  <button id="btn-rock-new" class="px-3.5 py-2 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.07] text-slate-300 text-xs font-medium cursor-pointer transition-all duration-150">
                     🎲 Randomize
                   </button>
                 </div>
               </div>
 
               <!-- Live Preview Stage -->
-              <div class="relative w-full h-64 sm:h-72 bg-radial from-slate-900 to-[#020713] rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden shadow-2xl">
+              <div class="relative w-full h-64 sm:h-72 bg-slate-950/40 rounded-3xl border border-white/[0.06] flex items-center justify-center overflow-hidden">
                 <canvas id="canvas-obstacle-preview" class="w-full h-full"></canvas>
-                <div class="absolute bottom-3 right-4 text-[10px] text-slate-400/80 font-mono">
-                  LIVE 60 FPS · PROCEDURAL GEOMETRY
+                <div class="absolute bottom-4 right-5 text-[10px] tracking-wide text-slate-500">
+                  LIVE · PROCEDURAL GEOMETRY
                 </div>
               </div>
 
               <!-- Specs Table -->
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">TOTAL IN WORLD</span>
-                  <span class="font-bold text-slate-200 text-sm">15–25 Formations</span>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Total in World</span>
+                  <span class="font-semibold text-slate-100 text-sm">15–25</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">SIZE MIX</span>
-                  <span class="font-bold text-slate-200 text-sm">60% S · 30% M · 10% L</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Size Mix</span>
+                  <span class="font-semibold text-slate-100 text-sm">60/30/10%</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">MIN SPACING</span>
-                  <span class="font-bold text-slate-200 text-sm">80 u between</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Min Spacing</span>
+                  <span class="font-semibold text-slate-100 text-sm">80 units</span>
                 </div>
-                <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <span class="text-slate-500 block text-[10px]">RAYCAST VISIBILITY</span>
-                  <span class="font-bold text-cyan-400 text-sm">Blocks Vision 100%</span>
+                <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
+                  <span class="text-slate-500 block text-[11px] mb-1">Vision Block</span>
+                  <span class="font-semibold text-slate-100 text-sm">100%</span>
                 </div>
               </div>
             </div>
@@ -555,19 +528,15 @@ export class ActorShowcase {
         </main>
 
         <!-- ================= BOTTOM STATUS FOOTER ================= -->
-        <footer class="px-6 py-3 border-t border-cyan-950/80 bg-slate-950/90 flex flex-wrap items-center justify-between text-xs text-slate-500 font-mono shrink-0">
-          <div class="flex items-center gap-3">
-            <span>Controls: <kbd class="px-1.5 py-0.5 rounded bg-slate-900 text-cyan-300">W/A/S/D</kbd> Move</span>
-            <span>·</span>
-            <span><kbd class="px-1.5 py-0.5 rounded bg-slate-900 text-rose-300">Space</kbd> Bite/Chomp</span>
-            <span>·</span>
-            <span><kbd class="px-1.5 py-0.5 rounded bg-slate-900 text-amber-300">1</kbd> Shark / <kbd class="px-1.5 py-0.5 rounded bg-slate-900 text-amber-300">2</kbd> Fish</span>
+        <footer class="px-6 sm:px-10 py-4 border-t border-white/[0.06] bg-slate-950/70 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500 shrink-0">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">W/A/S/D</kbd> Move</span>
+            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">Space</kbd> Bite</span>
+            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">1</kbd> Shark <kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">2</kbd> Fish</span>
           </div>
-          <div class="flex items-center gap-4">
-            <button id="footer-btn-dive" class="text-cyan-400 hover:text-cyan-300 font-bold underline cursor-pointer">
-              Launch Simulation →
-            </button>
-          </div>
+          <button id="footer-btn-dive" class="text-cyan-300 hover:text-cyan-200 font-medium cursor-pointer transition-colors duration-150">
+            Launch Simulation →
+          </button>
         </footer>
 
       </div>
@@ -597,12 +566,13 @@ export class ActorShowcase {
     };
 
     const activeStyles: Record<SelectedActor, string[]> = {
-      shark: ['border-sky-500/80', 'bg-sky-950/30'],
-      fish: ['border-amber-500/80', 'bg-amber-950/30'],
-      plant: ['border-emerald-500/80', 'bg-emerald-950/30'],
-      meat: ['border-rose-500/80', 'bg-rose-950/30'],
-      obstacle: ['border-slate-400', 'bg-slate-900/60'],
+      shark: ['border-sky-400/50', 'bg-sky-400/[0.07]'],
+      fish: ['border-amber-400/50', 'bg-amber-400/[0.07]'],
+      plant: ['border-emerald-400/50', 'bg-emerald-400/[0.07]'],
+      meat: ['border-rose-400/50', 'bg-rose-400/[0.07]'],
+      obstacle: ['border-slate-300/50', 'bg-slate-300/[0.07]'],
     };
+    const inactiveStyles = ['border-white/[0.06]', 'bg-white/[0.02]'];
 
     (Object.keys(items) as SelectedActor[]).forEach((key) => {
       const item = items[key];
@@ -610,10 +580,10 @@ export class ActorShowcase {
 
       // Remove active borders/bgs
       activeStyles[key].forEach((cls) => item?.classList.remove(cls));
-      item?.classList.add('border-slate-800', 'bg-slate-900/40');
+      item?.classList.add(...inactiveStyles);
 
       if (key === actor) {
-        item?.classList.remove('border-slate-800', 'bg-slate-900/40');
+        item?.classList.remove(...inactiveStyles);
         activeStyles[key].forEach((cls) => item?.classList.add(cls));
         panel?.classList.remove('hidden');
       } else {
