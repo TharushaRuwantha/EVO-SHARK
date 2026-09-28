@@ -35,7 +35,7 @@ export const CONFIG = {
       drag: 0.90,
       biteRange: 55,
       biteCooldown: 0.35,
-      initialCount: 1,
+      initialCount: 5,
       foodToClone: 2, // Eating 2 small fish (or equivalent meat) triggers cloning
       energyMax: 100,
       energyDrainPerSec: 2.2, // Must hunt regularly or starve
@@ -51,7 +51,7 @@ export const CONFIG = {
       drag: 0.92,
       biteRange: 38,
       biteCooldown: 0.25,
-      initialCount: 20, // 20 small fish at startup!
+      initialCount: 25, // 25 small fish at startup!
       foodToClone: 3,  // Eating 3 plants or meat remains triggers cloning
       energyMax: 100,
       energyDrainPerSec: 1.4,

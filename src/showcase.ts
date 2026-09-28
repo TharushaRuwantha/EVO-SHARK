@@ -135,9 +135,9 @@ export class ActorShowcase {
                   <h2 class="text-base font-semibold text-slate-100">
                     Shark
                   </h2>
-                  <span class="text-[10px] text-sky-300/70 shrink-0">1 apex</span>
+                  <span class="text-[10px] text-sky-300/70 shrink-0">5 apex</span>
                 </div>
-                <p class="text-xs text-slate-400 truncate mt-0.5">Predator · Space to chomp & kill</p>
+                <p class="text-xs text-slate-400 truncate mt-0.5">Predator · Hunts fish to survive</p>
               </div>
             </button>
 
@@ -151,7 +151,7 @@ export class ActorShowcase {
                   <h2 class="text-base font-semibold text-slate-100">
                     Small Fish
                   </h2>
-                  <span class="text-[10px] text-amber-300/70 shrink-0">20 alive</span>
+                  <span class="text-[10px] text-amber-300/70 shrink-0">25 alive</span>
                 </div>
                 <p class="text-xs text-slate-400 truncate mt-0.5">Forager · Hides under plants</p>
               </div>
@@ -326,7 +326,7 @@ export class ActorShowcase {
                 </div>
                 <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
                   <span class="text-slate-500 block text-[11px] mb-1">Start Population</span>
-                  <span class="font-semibold text-slate-100 text-sm">20 small fish</span>
+                  <span class="font-semibold text-slate-100 text-sm">25 small fish</span>
                 </div>
                 <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
                   <span class="text-slate-500 block text-[11px] mb-1">Cloning Threshold</span>
@@ -337,12 +337,12 @@ export class ActorShowcase {
                   <span class="font-semibold text-slate-100 text-sm">Plants & meat</span>
                 </div>
                 <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
-                  <span class="text-slate-500 block text-[11px] mb-1">Feeding Action</span>
-                  <span class="font-semibold text-slate-100 text-sm">Space to bite</span>
+                  <span class="text-slate-500 block text-[11px] mb-1">Movement</span>
+                  <span class="font-semibold text-slate-100 text-sm">Learned policy network</span>
                 </div>
                 <div class="bg-white/[0.02] p-4 rounded-2xl border border-white/[0.06]">
-                  <span class="text-slate-500 block text-[11px] mb-1">Cycle Hotkey</span>
-                  <span class="font-semibold text-slate-100 text-sm">Tab or key 2</span>
+                  <span class="text-slate-500 block text-[11px] mb-1">Starves Without Food</span>
+                  <span class="font-semibold text-slate-100 text-sm">Yes — energy drains over time</span>
                 </div>
               </div>
             </div>
