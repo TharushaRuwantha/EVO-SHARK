@@ -1,0 +1,6 @@
+{
+  "name": "2D Underwater Creature Simulation",
+  "description": "Phase 1 2D underwater physical simulation featuring manually controlled shark and fish, rocks, drifting plants, realistic drag physics, smooth collision sliding, and camera controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

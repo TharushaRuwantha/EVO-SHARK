@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>2D Underwater Creature Simulation</title>
+    <meta name="description" content="Phase 1 2D underwater physical simulation featuring manually controlled shark and fish, rocks, drifting plants, realistic drag physics, smooth collision sliding, and camera controls." />
+    <meta property="og:title" content="2D Underwater Creature Simulation" />
+    <meta property="og:description" content="Phase 1 2D underwater physical simulation featuring manually controlled shark and fish, rocks, drifting plants, realistic drag physics, smooth collision sliding, and camera controls." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="/src/index.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html, body, #app {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #020810;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #sim-wrapper > canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+
