@@ -845,7 +845,7 @@ export class Renderer {
     const x = 16;
     const y = 68;
     const w = 275;
-    const h = 202;
+    const h = 222;
 
     ctx.fillStyle = 'rgba(2, 6, 23, 0.85)';
     ctx.fillRect(x, y, w, h);
@@ -887,10 +887,22 @@ export class Renderer {
     ctx.fillStyle = isShark ? '#38bdf8' : '#34d399';
     ctx.fillRect(x + 12, y + 60, pbW * foodRatio, 6);
 
+    // Hunger / Energy status — starves to death at 0
+    const hungerRatio = c ? c.energy / c.stats.energyMax : 0;
+    const hungerColor = hungerRatio > 0.5 ? '#4ade80' : hungerRatio > 0.2 ? '#facc15' : '#f87171';
+    ctx.font = '10px monospace';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(`Hunger: ${(hungerRatio * 100).toFixed(0)}% ${hungerRatio <= 0.2 ? '⚠️ STARVING' : ''}`, x + 12, y + 78);
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+    ctx.fillRect(x + 12, y + 84, pbW, 6);
+    ctx.fillStyle = hungerColor;
+    ctx.fillRect(x + 12, y + 84, pbW * hungerRatio, 6);
+
     ctx.fillStyle = '#cbd5e1';
     ctx.font = '10px monospace';
     const lineSpacing = 15;
-    let textY = y + 84;
+    let textY = y + 108;
 
     ctx.fillText(`Pos: (${c.x.toFixed(0)}, ${c.y.toFixed(0)})`, x + 12, textY);
     textY += lineSpacing;

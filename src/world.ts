@@ -51,27 +51,41 @@ export class World {
     // 2. Generate Initial Plants
     this.plants = generateInitialPlants(this.rng, this.obstacles);
 
-    // 3. Spawn Initial Shark (1)
-    const sharkPos = this.findSafeSpawnPosition(600, 600, CONFIG.species.shark.radius);
-    const shark = new Creature('shark', sharkPos.x, sharkPos.y, 0);
-    this.sharks = [shark];
-
-    // 4. Spawn Initial Small Fish (20)
-    this.fishList = [];
-    for (let i = 0; i < CONFIG.species.fish.initialCount; i++) {
-      const clusterCenterX = 1100 + (i % 4) * 180 + this.rng.range(-60, 60);
-      const clusterCenterY = 400 + Math.floor(i / 4) * 140 + this.rng.range(-50, 50);
-      const fishPos = this.findSafeSpawnPosition(clusterCenterX, clusterCenterY, CONFIG.species.fish.radius);
-      const heading = this.rng.range(-Math.PI, Math.PI);
-      const fish = new Creature('fish', fishPos.x, fishPos.y, heading);
-      this.fishList.push(fish);
-    }
+    // 3. Spawn Initial Sharks & Small Fish
+    this.sharks = this.spawnInitialSharks();
+    this.fishList = this.spawnInitialFish();
 
     // Default control to Shark initially
     this.controlledCreature = this.sharks[0];
     this.controlledCreature.isControlled = true;
 
     this.updatePlantCover();
+  }
+
+  private spawnInitialSharks(): Creature[] {
+    const sharks: Creature[] = [];
+    const count = CONFIG.species.shark.initialCount;
+    for (let i = 0; i < count; i++) {
+      const clusterCenterX = 500 + (i % 3) * 220 + this.rng.range(-60, 60);
+      const clusterCenterY = 500 + Math.floor(i / 3) * 220 + this.rng.range(-60, 60);
+      const sharkPos = this.findSafeSpawnPosition(clusterCenterX, clusterCenterY, CONFIG.species.shark.radius);
+      const heading = this.rng.range(-Math.PI, Math.PI);
+      sharks.push(new Creature('shark', sharkPos.x, sharkPos.y, heading));
+    }
+    return sharks;
+  }
+
+  private spawnInitialFish(): Creature[] {
+    const fishList: Creature[] = [];
+    const count = CONFIG.species.fish.initialCount;
+    for (let i = 0; i < count; i++) {
+      const clusterCenterX = 1100 + (i % 4) * 180 + this.rng.range(-60, 60);
+      const clusterCenterY = 400 + Math.floor(i / 4) * 140 + this.rng.range(-50, 50);
+      const fishPos = this.findSafeSpawnPosition(clusterCenterX, clusterCenterY, CONFIG.species.fish.radius);
+      const heading = this.rng.range(-Math.PI, Math.PI);
+      fishList.push(new Creature('fish', fishPos.x, fishPos.y, heading));
+    }
+    return fishList;
   }
 
   public get primaryShark(): Creature {
@@ -463,18 +477,8 @@ export class World {
     this.obstacles = generateObstacles(this.rng);
     this.plants = generateInitialPlants(this.rng, this.obstacles);
 
-    const sharkPos = this.findSafeSpawnPosition(600, 600, CONFIG.species.shark.radius);
-    const shark = new Creature('shark', sharkPos.x, sharkPos.y, 0);
-    this.sharks = [shark];
-
-    this.fishList = [];
-    for (let i = 0; i < CONFIG.species.fish.initialCount; i++) {
-      const clusterCenterX = 1100 + (i % 4) * 180 + this.rng.range(-60, 60);
-      const clusterCenterY = 400 + Math.floor(i / 4) * 140 + this.rng.range(-50, 50);
-      const fishPos = this.findSafeSpawnPosition(clusterCenterX, clusterCenterY, CONFIG.species.fish.radius);
-      const fish = new Creature('fish', fishPos.x, fishPos.y, this.rng.range(-Math.PI, Math.PI));
-      this.fishList.push(fish);
-    }
+    this.sharks = this.spawnInitialSharks();
+    this.fishList = this.spawnInitialFish();
 
     this.controlledCreature = this.sharks[0];
     this.controlledCreature.isControlled = true;
