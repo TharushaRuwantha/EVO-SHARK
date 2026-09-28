@@ -7,7 +7,7 @@ import { Renderer } from './render';
 import { ActorShowcase, PilotTarget } from './showcase';
 import { sound } from './audio';
 
-type ViewMode = 'simulation' | 'showcase';
+type ViewMode = 'simulation' | 'showcase' | 'free';
 
 function bootstrap(): void {
   const appContainer = document.getElementById('app');
@@ -27,10 +27,9 @@ function bootstrap(): void {
   simWrapper.className = 'absolute inset-0 w-full h-full';
   appContainer.appendChild(simWrapper);
 
-  // Canvas
+  // Canvas (full-bleed, no border, so the ocean map fills the entire viewport)
   const canvas = document.createElement('canvas');
-  canvas.className = 'w-full h-full block cursor-crosshair border border-[#004dff]';
-  canvas.style.borderColor = '#004dff';
+  canvas.className = 'w-full h-full block cursor-crosshair';
   simWrapper.appendChild(canvas);
 
   // 2. Showcase Wrapper
@@ -43,52 +42,55 @@ function bootstrap(): void {
   const topBar = document.createElement('nav');
   topBar.id = 'top-nav-bar';
   topBar.className =
-    'absolute top-3 left-4 right-4 z-40 flex flex-wrap items-center justify-between gap-2.5 px-4 py-2.5 rounded-xl bg-slate-950/85 backdrop-blur-md border border-cyan-900/50 shadow-2xl text-xs text-slate-200 select-none';
+    'absolute top-3 left-3 right-3 sm:left-4 sm:right-4 z-40 flex flex-wrap items-center justify-between gap-2.5 px-3.5 sm:px-4 py-2.5 rounded-2xl bg-slate-950/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.5)] text-xs text-slate-200 select-none transition-colors duration-300';
   topBar.innerHTML = `
-    <!-- Left: Return to Standalone Menu Page -->
+    <!-- Left: Return to Standalone Menu Page + Mode Badge -->
     <div class="flex items-center gap-2">
-      <button id="btn-back-to-menu" title="Return to Standalone Menu Page (M or Esc)" class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-900 to-blue-900 border border-cyan-500/70 hover:from-cyan-800 hover:to-blue-800 text-cyan-200 font-bold transition flex items-center gap-2 cursor-pointer shadow-md hover:shadow-cyan-950">
-        <span>☰</span> Main Menu <kbd class="px-1 py-0.5 rounded bg-cyan-950 text-[10px] text-cyan-300 font-mono">M</kbd>
+      <button id="btn-back-to-menu" title="Return to Standalone Menu Page (M or Esc)" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-900 to-blue-900 border border-cyan-500/70 hover:from-cyan-800 hover:to-blue-800 text-cyan-200 font-bold transition-all duration-150 flex items-center gap-2 cursor-pointer shadow-md hover:shadow-cyan-950 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">
+        <span>☰</span> <span class="hidden sm:inline">Main Menu</span> <kbd class="px-1 py-0.5 rounded bg-cyan-950 text-[10px] text-cyan-300 font-mono">M</kbd>
       </button>
+      <span id="mode-badge" class="hidden px-2.5 py-1 rounded-lg bg-violet-950/80 border border-violet-500/60 text-violet-300 font-bold text-[10px] tracking-widest uppercase items-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse"></span> Free Test Arena
+      </span>
     </div>
 
     <!-- Center: Creature Controller Switcher (Shark / Small Fish) -->
     <div id="controller-switcher" class="flex items-center gap-2">
       <span class="text-[11px] font-mono text-slate-400 uppercase tracking-wider hidden sm:inline">Pilot:</span>
-      <div class="flex items-center bg-slate-900/90 p-1 rounded-lg border border-slate-800">
-        <button id="btn-ctrl-shark" class="px-3 py-1.5 rounded-md font-bold transition flex items-center gap-1.5 bg-sky-950 border border-sky-500/80 text-sky-300 shadow-sm cursor-pointer">
+      <div class="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+        <button id="btn-ctrl-shark" class="px-3 py-1.5 rounded-lg font-bold transition-all duration-150 flex items-center gap-1.5 bg-sky-950 border border-sky-500/80 text-sky-300 shadow-sm cursor-pointer active:scale-95">
           <span>🦈</span> <span id="label-shark">Shark</span> <kbd class="px-1 py-0.5 rounded bg-sky-900/80 text-[10px] text-sky-200 font-mono">1</kbd>
         </button>
-        <button id="btn-ctrl-fish" class="px-3 py-1.5 rounded-md font-medium transition flex items-center gap-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-800/80 cursor-pointer">
+        <button id="btn-ctrl-fish" class="px-3 py-1.5 rounded-lg font-medium transition-all duration-150 flex items-center gap-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-800/80 cursor-pointer active:scale-95">
           <span>🐟</span> <span id="label-fish">Fish (20 alive)</span> <kbd class="px-1 py-0.5 rounded bg-slate-800 text-[10px] text-slate-400 font-mono">2</kbd>
         </button>
       </div>
 
       <!-- Quick Bite Action Indicator / Button -->
-      <button id="btn-quick-bite" class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 border border-slate-700 bg-slate-900 text-slate-400 cursor-pointer shadow-md">
+      <button id="btn-quick-bite" class="px-3 py-1.5 rounded-xl font-bold transition-all duration-150 flex items-center gap-1.5 border border-slate-700 bg-slate-900 text-slate-400 cursor-pointer shadow-md active:scale-95">
         <span>💥</span> <span id="bite-button-text">Bite</span> <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono">Space</kbd>
       </button>
     </div>
 
     <!-- Right: Quick Environment Actions -->
-    <div class="flex items-center gap-2">
-      <button id="btn-top-regen-plants" title="Regenerate all plants in the ocean" class="px-2.5 py-1.5 rounded-lg bg-emerald-950/70 border border-emerald-600/50 hover:bg-emerald-900/60 text-emerald-300 font-semibold flex items-center gap-1.5 transition cursor-pointer">
-        <span>🌱</span> Regen Plants <kbd class="hidden md:inline px-1 py-0.5 rounded bg-emerald-900/80 text-[10px] text-emerald-200 font-mono">E</kbd>
+    <div class="flex items-center gap-1.5 sm:gap-2">
+      <button id="btn-top-regen-plants" title="Regenerate all plants in the ocean" class="px-2.5 py-1.5 rounded-xl bg-emerald-950/70 border border-emerald-600/50 hover:bg-emerald-900/60 text-emerald-300 font-semibold flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>🌱</span> <span class="hidden lg:inline">Regen Plants</span> <kbd class="hidden md:inline px-1 py-0.5 rounded bg-emerald-900/80 text-[10px] text-emerald-200 font-mono">E</kbd>
       </button>
 
-      <button id="btn-toggle-follow" title="Toggle camera following creature" class="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium flex items-center gap-1 transition cursor-pointer">
-        <span>🎥</span> Follow <kbd class="hidden md:inline px-1 py-0.5 rounded bg-slate-800 text-[10px] font-mono">F</kbd>
+      <button id="btn-toggle-follow" title="Toggle camera following creature" class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium flex items-center gap-1 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>🎥</span> <span class="hidden lg:inline">Follow</span> <kbd class="hidden md:inline px-1 py-0.5 rounded bg-slate-800 text-[10px] font-mono">F</kbd>
       </button>
 
-      <button id="btn-reset-world" title="Reset ocean with fresh seed" class="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium flex items-center gap-1 transition cursor-pointer">
-        <span>🔄</span> Reset <kbd class="hidden md:inline px-1 py-0.5 rounded bg-slate-800 text-[10px] font-mono">R</kbd>
+      <button id="btn-reset-world" title="Reset ocean with fresh seed" class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-medium flex items-center gap-1 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>🔄</span> <span class="hidden lg:inline">Reset</span> <kbd class="hidden md:inline px-1 py-0.5 rounded bg-slate-800 text-[10px] font-mono">R</kbd>
       </button>
 
-      <button id="btn-toggle-sound" title="Toggle sound effects" class="p-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-sm transition cursor-pointer">
+      <button id="btn-toggle-sound" title="Toggle sound effects" class="p-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
         🔊
       </button>
 
-      <button id="btn-toggle-help" title="Controls help" class="p-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-sm transition cursor-pointer">
+      <button id="btn-toggle-help" title="Controls help" class="p-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
         ❓
       </button>
     </div>
@@ -169,16 +171,30 @@ function bootstrap(): void {
   const input = new InputManager();
   const camera = new Camera(canvas, input);
   const renderer = new Renderer(canvas);
-  const world = new World(CONFIG.world.seed);
+
+  // Main simulation world (#/sim) and an exact, fully independent copy of it
+  // mounted at (#/free) for separate experimentation/testing without ever
+  // touching the state of the main simulation.
+  const simWorld = new World(CONFIG.world.seed);
+  const freeWorld = new World(CONFIG.world.seed + 1);
+
+  // `world` always points at whichever world is currently active/on-screen.
+  let world: World = simWorld;
 
   camera.followTarget = world.controlledCreature;
 
   // Showcase instance
   let showcase: ActorShowcase | null = null;
 
+  const modeBadge = topBar.querySelector('#mode-badge');
+
   // Separate Page Router / View Mode Switcher
   function setViewMode(mode: ViewMode, pilotTarget?: PilotTarget): void {
     currentView = mode;
+
+    if (mode === 'simulation' || mode === 'free') {
+      world = mode === 'free' ? freeWorld : simWorld;
+    }
 
     if (pilotTarget === 'shark') {
       world.setControlledByIndex(0);
@@ -188,18 +204,23 @@ function bootstrap(): void {
       updateControllerButtons();
     }
 
-    if (mode === 'simulation') {
-      if (window.location.hash !== '#/sim') {
-        history.replaceState(null, '', '#/sim');
+    if (mode === 'simulation' || mode === 'free') {
+      const targetHash = mode === 'free' ? '#/free' : '#/sim';
+      if (window.location.hash !== targetHash) {
+        history.replaceState(null, '', targetHash);
       }
       simWrapper.classList.remove('hidden');
       topBar.classList.remove('hidden');
       showcaseWrapper.classList.add('hidden');
+      modeBadge?.classList.toggle('hidden', mode !== 'free');
+      modeBadge?.classList.toggle('flex', mode === 'free');
 
       if (showcase) {
         showcase.destroy();
         showcase = null;
       }
+      camera.followTarget = world.controlledCreature;
+      updateControllerButtons();
       handleResize();
     } else {
       if (window.location.hash !== '#/menu') {
@@ -210,9 +231,12 @@ function bootstrap(): void {
       showcaseWrapper.classList.remove('hidden');
 
       if (!showcase) {
-        showcase = new ActorShowcase(showcaseWrapper, world, (target) => {
-          setViewMode('simulation', target);
-        });
+        showcase = new ActorShowcase(
+          showcaseWrapper,
+          simWorld,
+          (target) => setViewMode('simulation', target),
+          () => setViewMode('free')
+        );
       }
     }
   }
@@ -274,12 +298,14 @@ function bootstrap(): void {
   // Bind Top Bar UI Clicks
   topBar.querySelector('#btn-back-to-menu')?.addEventListener('click', () => setViewMode('showcase'));
 
-  // Browser navigation support (back/forward between #/menu and #/sim)
+  // Browser navigation support (back/forward between #/menu, #/sim, #/free)
   window.addEventListener('hashchange', () => {
     const hash = window.location.hash;
     if (hash === '#/sim' && currentView !== 'simulation') {
       setViewMode('simulation');
-    } else if (hash !== '#/sim' && currentView !== 'showcase') {
+    } else if (hash === '#/free' && currentView !== 'free') {
+      setViewMode('free');
+    } else if (hash !== '#/sim' && hash !== '#/free' && currentView !== 'showcase') {
       setViewMode('showcase');
     }
   });
@@ -362,7 +388,7 @@ function bootstrap(): void {
   };
 
   input.onToggleViewMode = () => {
-    setViewMode(currentView === 'simulation' ? 'showcase' : 'simulation');
+    setViewMode(currentView === 'showcase' ? 'simulation' : 'showcase');
   };
 
   input.onBiteTriggered = () => {
