@@ -51,12 +51,12 @@ export const CONFIG = {
       drag: 0.90,
       biteRange: 55, // proximity used for meat-scavenging and the AI targeting cue
       biteCooldownTicks: 18, // ticks between bite attempts (60Hz tick)
-      initialCount: 2,
+      initialCount: 5,
       foodToClone: 2, // Eating 2 small fish (or equivalent meat) triggers cloning
       // Energy
       energyMax: 100,
-      idleDrain: 0.03, // energy/tick while idle
-      thrustDrain: 0.15, // extra energy/tick at full thrust
+      idleDrain: 0.015, // energy/tick while idle (slowed hunger)
+      thrustDrain: 0.08, // extra energy/tick at full thrust (slowed hunger)
       energyGainPerFood: 45, // scavenging floating meat remains
       preyEnergyGain: 80, // killing prey outright with a bite
       // Health regeneration: costs energy, scales with how fed the
@@ -82,7 +82,7 @@ export const CONFIG = {
       drag: 0.92,
       biteRange: 38, // proximity used for meat-scavenging and the AI targeting cue
       biteCooldownTicks: 15, // ticks between eat attempts (60Hz tick)
-      initialCount: 20,
+      initialCount: 25,
       foodToClone: 3,  // Eating 3 plants or meat remains triggers cloning
       // Energy
       energyMax: 100,
