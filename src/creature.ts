@@ -29,10 +29,17 @@ export class Creature {
   public cloneCount: number = 0;
   public energy: number;
 
+  // Health & death
+  public health: number;
+  public deathCause: 'STARVATION' | 'EATEN' | null = null;
+  public deathFadeTicks: number = 0; // ticks since death; fade/shrink completes at 30
+
   // Bite mechanics & animation
-  public biteCooldownTimer: number = 0;
+  public biteCooldownTimer: number = 0; // ticks remaining until next bite/eat allowed
   public biteAnimationProgress: number = 0; // 0 to 1
   public isBiting: boolean = false;
+  public mouthFlashTicks: number = 0; // ticks remaining on the mouth-flash / jaw animation
+  public recentDamageTicks: number = 0; // ticks remaining on the "just got bitten" red flash
   public biteScore: number = 0;
 
   constructor(type: SpeciesType, x: number, y: number, heading: number = 0) {
@@ -44,6 +51,28 @@ export class Creature {
     this.heading = heading;
     this.foodToClone = this.stats.foodToClone;
     this.energy = this.stats.energyMax;
+    this.health = this.stats.maxHealth;
+  }
+
+  // --- Physiology, computed every tick (see World.tickAI) ---
+  get energyFraction(): number {
+    return this.energy / this.stats.energyMax;
+  }
+
+  get healthFraction(): number {
+    return this.health / this.stats.maxHealth;
+  }
+
+  get hungerSignal(): number {
+    return 1 - this.energyFraction;
+  }
+
+  get biteCooldownFraction(): number {
+    return this.biteCooldownTimer / this.stats.biteCooldownTicks;
+  }
+
+  get recentDamage(): number {
+    return this.recentDamageTicks > 0 ? 1 : 0;
   }
 
   get radius(): number {
@@ -80,7 +109,8 @@ export class Creature {
    */
   public triggerBite(): boolean {
     if (this.biteCooldownTimer <= 0) {
-      this.biteCooldownTimer = this.stats.biteCooldown;
+      this.biteCooldownTimer = this.stats.biteCooldownTicks;
+      this.mouthFlashTicks = 6;
       this.biteAnimationProgress = 0.01;
       this.isBiting = true;
       return true;
@@ -97,22 +127,23 @@ export class Creature {
 
     const { maxTurnRate, maxThrust, maxSpeed, drag } = this.stats;
 
-    // Advance bite animation and cooldown
+    // Advance bite cooldown, mouth-flash and damage-flash timers (all tick-based,
+    // one tick per call since tick() runs once per fixed 60Hz physics step).
+    // The actual bite/eat attempt itself is triggered by World.attemptBite(),
+    // which calls triggerBite() when input.wantsBite fires.
     if (this.biteCooldownTimer > 0) {
-      this.biteCooldownTimer -= dt;
+      this.biteCooldownTimer--;
     }
-
-    if (this.isBiting) {
-      this.biteAnimationProgress += dt / this.stats.biteCooldown;
-      if (this.biteAnimationProgress >= 1) {
+    if (this.mouthFlashTicks > 0) {
+      this.mouthFlashTicks--;
+      this.biteAnimationProgress = 1 - this.mouthFlashTicks / 6;
+      if (this.mouthFlashTicks === 0) {
         this.isBiting = false;
         this.biteAnimationProgress = 0;
       }
     }
-
-    // Check if input triggered bite
-    if (input.wantsBite) {
-      this.triggerBite();
+    if (this.recentDamageTicks > 0) {
+      this.recentDamageTicks--;
     }
 
     // 1. heading += turnInput * maxTurnRate * dt (only turns when key pressed)

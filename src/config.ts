@@ -33,13 +33,26 @@ export const CONFIG = {
       maxSpeed: 190,  // Faster top cruising speed
       maxTurnRate: 2.6, // Snappy turns
       drag: 0.90,
-      biteRange: 55,
-      biteCooldown: 0.35,
+      biteRange: 55, // proximity used for meat-scavenging and the AI targeting cue
+      biteCooldownTicks: 18, // ticks between bite attempts (60Hz tick)
       initialCount: 5,
       foodToClone: 2, // Eating 2 small fish (or equivalent meat) triggers cloning
+      // Energy
       energyMax: 100,
-      energyDrainPerSec: 2.2, // Must hunt regularly or starve
-      energyGainPerFood: 45,
+      idleDrain: 0.03, // energy/tick while idle
+      thrustDrain: 0.15, // extra energy/tick at full thrust
+      energyGainPerFood: 45, // scavenging floating meat remains
+      preyEnergyGain: 80, // killing prey outright with a bite
+      // Health
+      maxHealth: 100,
+      regenRate: 0.01, // health/tick, only while well-fed
+      regenEnergyThreshold: 0.5,
+      // Bite attack
+      biteDamage: 12,
+      biteEnergyCost: 2, // spent per bite attempt, hit or miss
+      biteHitboxOffset: 20, // units in front of the mouth
+      biteHitboxRadius: 18,
+      plantEnergyGain: 0, // sharks don't eat plants
     },
     fish: {
       name: 'Fish (Small Fish)',
@@ -49,13 +62,27 @@ export const CONFIG = {
       maxSpeed: 220,  // Faster top dart speed
       maxTurnRate: 4.2, // Agile, rapid turns
       drag: 0.92,
-      biteRange: 38,
-      biteCooldown: 0.25,
+      biteRange: 38, // proximity used for meat-scavenging and the AI targeting cue
+      biteCooldownTicks: 15, // ticks between eat attempts (60Hz tick)
       initialCount: 25, // 25 small fish at startup!
       foodToClone: 3,  // Eating 3 plants or meat remains triggers cloning
+      // Energy
       energyMax: 100,
-      energyDrainPerSec: 1.4,
-      energyGainPerFood: 30,
+      idleDrain: 0.01, // energy/tick while idle
+      thrustDrain: 0.05, // extra energy/tick at full thrust
+      energyGainPerFood: 30, // scavenging floating meat remains
+      plantEnergyGain: 25, // eating a plant
+      preyEnergyGain: 0, // fish don't kill prey
+      // Health
+      maxHealth: 30,
+      regenRate: 0.02, // health/tick, only while well-fed
+      regenEnergyThreshold: 0.4,
+      // Bite attack (fish have no attack damage, but share the shape so
+      // SpeciesStats stays a single uniform type across both species)
+      biteDamage: 0,
+      biteEnergyCost: 0,
+      biteHitboxOffset: 0,
+      biteHitboxRadius: 0,
     },
   },
   rl: {

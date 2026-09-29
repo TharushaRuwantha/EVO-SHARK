@@ -241,7 +241,7 @@ export class ActorShowcase {
               <div class="p-4 rounded-2xl bg-rose-500/[0.06] border border-rose-400/15 flex items-start gap-4 text-sm">
                 <span class="text-xl mt-0.5">💥</span>
                 <p class="text-slate-300 leading-relaxed">
-                  <strong class="text-rose-300 font-semibold">Must bite to kill.</strong> Simply swimming into small fish does not kill them — the shark must press <span class="text-rose-300 font-medium">Space</span> when in range to chomp. A connected bite kills instantly and drops 3 drifting meat chunks.
+                  <strong class="text-rose-300 font-semibold">Must bite to kill.</strong> Simply swimming into small fish does not damage them — the shark must land a chomp when in range. Each bite deals 12 damage on an 18-tick cooldown, so it takes a few connected bites to bring a fish down; the killing blow drops 3 drifting meat chunks.
                 </p>
               </div>
 
