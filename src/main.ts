@@ -94,6 +94,10 @@ function bootstrap(): void {
         <span>🧠</span> <span class="hidden lg:inline">Brain</span>
       </button>
 
+      <button id="btn-toggle-fullscreen" title="Toggle true fullscreen (double-click map)" class="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
+        ⛶
+      </button>
+
       <button id="btn-toggle-help" title="About this training mode" class="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
         ❓
       </button>
@@ -297,6 +301,26 @@ function bootstrap(): void {
   brainBtn?.addEventListener('click', () => brainViz.toggle());
   input.onToggleBrainViz = () => brainViz.toggle();
 
+  // True browser fullscreen, so the ocean map can fill the entire display
+  // (not just the browser viewport) while exploring it.
+  const fullscreenBtn = topBar.querySelector('#btn-toggle-fullscreen');
+  function toggleFullscreen(): void {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void appContainer?.requestFullscreen();
+    }
+  }
+  fullscreenBtn?.addEventListener('click', toggleFullscreen);
+  canvas.addEventListener('dblclick', toggleFullscreen);
+  document.addEventListener('fullscreenchange', () => {
+    fullscreenBtn?.setAttribute(
+      'title',
+      document.fullscreenElement ? 'Exit fullscreen (Esc)' : 'Toggle true fullscreen (double-click map)'
+    );
+    handleResize();
+  });
+
   const helpBtn = topBar.querySelector('#btn-toggle-help');
   const closeHelpBtn = helpModal.querySelector('#btn-close-help');
   const gotItHelpBtn = helpModal.querySelector('#btn-help-got-it');
@@ -325,8 +349,13 @@ function bootstrap(): void {
     setViewMode(currentView === 'showcase' ? 'simulation' : 'showcase');
   };
 
-  // Canvas click: spectate the clicked creature (camera + HUD focus only — does not control it)
+  // Canvas click: spectate the clicked creature (camera + HUD focus only — does not control it).
+  // Left-click also drags the camera to pan/explore the map, so a click that
+  // was really a pan gesture must not additionally select whatever creature
+  // happened to be under the cursor when the drag ended.
   canvas.addEventListener('click', (e: MouseEvent) => {
+    if (camera.consumeDidDrag()) return;
+
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
