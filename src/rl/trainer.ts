@@ -4,7 +4,7 @@ import { World } from '../world';
 import { CreatureInput } from '../creature';
 import { SpeciesAgent } from './agent';
 import { ForwardResult } from './network';
-import { buildObservation } from './perception';
+import { buildObservation, OBS_SIZE } from './perception';
 import { actionToInput } from './actions';
 import { Checkpoint, loadCheckpoint, saveCheckpoint, saveCheckpointBeacon } from './persistence';
 
@@ -64,10 +64,23 @@ export class Trainer {
   public async init(): Promise<void> {
     if (!this.persist) return;
     const checkpoint = await loadCheckpoint();
-    if (checkpoint) {
-      this.applyCheckpoint(checkpoint);
-      this.resumedFromCheckpoint = true;
+    if (!checkpoint) return;
+
+    // A checkpoint saved under a different observation layout (e.g. the
+    // pre-refactor 16-input oracle sensors) can't be loaded into today's
+    // 129-input network — start fresh instead of crashing or silently
+    // running with garbage-shaped weights.
+    const savedInputSize = checkpoint.shark?.network?.inputSize;
+    if (savedInputSize !== OBS_SIZE) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[Trainer] Ignoring checkpoint with inputSize=${savedInputSize} (expected ${OBS_SIZE}); starting fresh training.`
+      );
+      return;
     }
+
+    this.applyCheckpoint(checkpoint);
+    this.resumedFromCheckpoint = true;
   }
 
   private applyCheckpoint(checkpoint: Checkpoint): void {

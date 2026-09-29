@@ -16,6 +16,8 @@ import { Creature, CreatureInput } from './creature';
 import { MeatRemains, spawnFishRemains, updateMeatRemains } from './food';
 import { ParticleSystem } from './particles';
 import { sound } from './audio';
+import { SpatialGrid } from './rl/spatialGrid';
+import { SmellField } from './rl/smellField';
 
 const IDLE_INPUT: CreatureInput = {
   thrustInput: 0,
@@ -41,6 +43,13 @@ export class World {
   public ticks: number = 0;
   private plantTimer = { timer: 0 };
 
+  // Shared per-tick sensor infrastructure: rebuilt/updated once per tick in
+  // tickAI() and read by every creature's buildObservation() call next tick
+  // (same one-tick-lag convention already used for position/velocity).
+  public plantGrid: SpatialGrid<Plant> = new SpatialGrid(64);
+  public creatureGrid: SpatialGrid<Creature> = new SpatialGrid(64);
+  public smellField: SmellField = new SmellField();
+
   constructor(seed: number = CONFIG.world.seed) {
     this.seed = seed;
     this.rng = new PRNG(seed);
@@ -60,6 +69,18 @@ export class World {
     this.controlledCreature.isControlled = true;
 
     this.updatePlantCover();
+    this.rebuildSensorGrids();
+  }
+
+  /**
+   * Rebuilds the shared spatial grids and advances the scent fields. Called
+   * once per tick (end of tickAI) so every creature's next sensor read sees
+   * this tick's positions.
+   */
+  private rebuildSensorGrids(): void {
+    this.plantGrid.build(this.plants);
+    this.creatureGrid.build([...this.sharks, ...this.fishList].filter((c) => !c.isDead));
+    this.smellField.update(this.aliveFish, this.aliveSharks, this.meatRemains);
   }
 
   private spawnInitialSharks(): Creature[] {
@@ -518,6 +539,8 @@ export class World {
     this.controlledCreature.isControlled = true;
 
     this.updatePlantCover();
+    this.smellField.reset();
+    this.rebuildSensorGrids();
   }
 
   public findSafeSpawnPosition(prefX: number, prefY: number, radius: number): { x: number; y: number } {
@@ -636,5 +659,7 @@ export class World {
     updateFloatingTexts(this.floatingTexts, dt);
     this.particles.update(dt);
     updatePlantReproduction(this.plants, this.obstacles, this.rng, dt, this.plantTimer);
+
+    this.rebuildSensorGrids();
   }
 }

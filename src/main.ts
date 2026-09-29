@@ -8,6 +8,7 @@ import { ActorShowcase, PilotTarget } from './showcase';
 import { sound } from './audio';
 import { Trainer } from './rl/trainer';
 import { BrainVisualizer } from './brainviz';
+import { SensorPanel } from './sensorPanel';
 
 type ViewMode = 'simulation' | 'showcase' | 'free';
 
@@ -98,6 +99,10 @@ function bootstrap(): void {
         ⛶
       </button>
 
+      <button id="btn-toggle-sensor-panel" title="Show/hide the full live sensor vector for the selected creature (X)" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>📡</span> <span class="hidden lg:inline">Sensors</span>
+      </button>
+
       <button id="btn-toggle-help" title="About this training mode" class="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
         ❓
       </button>
@@ -142,9 +147,17 @@ function bootstrap(): void {
           <span class="text-slate-400">Camera pan / zoom / follow</span>
           <span class="text-slate-300">Wheel · middle drag · F</span>
         </div>
-        <div class="flex justify-between items-center py-2">
+        <div class="flex justify-between items-center py-2 border-b border-white/[0.05]">
           <span class="text-slate-400">Show/hide selected creature's brain</span>
           <span class="text-slate-100 font-medium">N</span>
+        </div>
+        <div class="flex justify-between items-center py-2 border-b border-white/[0.05]">
+          <span class="text-slate-400">Show/hide full live sensor vector</span>
+          <span class="text-slate-100 font-medium">X</span>
+        </div>
+        <div class="flex justify-between items-center py-2">
+          <span class="text-slate-400">Vision/touch/lateral-line/electro overlay · scent heatmap</span>
+          <span class="text-slate-100 font-medium">C · S</span>
         </div>
       </div>
 
@@ -162,6 +175,7 @@ function bootstrap(): void {
   const camera = new Camera(canvas, input);
   const renderer = new Renderer(canvas);
   const brainViz = new BrainVisualizer(simWrapper);
+  const sensorPanel = new SensorPanel(simWrapper);
 
   // Main simulation world (#/sim), persistently trained and checkpointed, and
   // an exact, fully independent copy mounted at (#/free) for separate,
@@ -300,6 +314,8 @@ function bootstrap(): void {
   const brainBtn = topBar.querySelector('#btn-toggle-brain');
   brainBtn?.addEventListener('click', () => brainViz.toggle());
   input.onToggleBrainViz = () => brainViz.toggle();
+  input.onToggleSensorPanel = () => sensorPanel.toggle();
+  topBar.querySelector('#btn-toggle-sensor-panel')?.addEventListener('click', () => sensorPanel.toggle());
 
   // True browser fullscreen, so the ocean map can fill the entire display
   // (not just the browser viewport) while exploring it.
@@ -449,13 +465,18 @@ function bootstrap(): void {
       renderer.render(world, camera, input, currentFps, currentTime / 1000);
       updateTrainingStatsUI();
 
-      if (brainViz.isVisible) {
+      if (brainViz.isVisible || sensorPanel.isVisible) {
         const controlled = world.controlledCreature;
         if (controlled && !controlled.isDead) {
           const agent = controlled.type === 'shark' ? trainer.sharkAgent : trainer.fishAgent;
           const latest = trainer.getLastForward(controlled.id);
           if (latest) {
-            brainViz.render(controlled, agent.network, latest.forward, latest.action, currentTime);
+            if (brainViz.isVisible) {
+              brainViz.render(controlled, agent.network, latest.forward, latest.action, currentTime);
+            }
+            if (sensorPanel.isVisible) {
+              sensorPanel.render(controlled, latest.forward.obs, currentTime);
+            }
           }
         }
       }

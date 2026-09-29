@@ -101,6 +101,33 @@ export const CONFIG = {
     decayTime: 50,
     radius: 7,
   },
+  sensors: {
+    vision: {
+      shark: { rayCount: 12, fovDeg: 240, range: 400, angularJitterDeg: 5, distanceNoisePct: 10 },
+      fish: { rayCount: 12, fovDeg: 280, range: 350, angularJitterDeg: 5, distanceNoisePct: 10 },
+    },
+    smell: {
+      gridW: 50,
+      gridH: 30,
+      cellSize: 40,
+      diffusionRate: 0.1,
+      decayRate: 0.02,
+      maxValue: 1.0,
+      sampleRadius: 60,
+      noisePct: 8,
+    },
+    lateralLine: {
+      shark: { range: 200, noisePct: 10 },
+      fish: { range: 180, noisePct: 10 },
+    },
+    electroreception: {
+      shark: { range: 60, noisePct: 15 },
+      fish: { range: 50, noisePct: 15 },
+    },
+    physiology: {
+      recentDamageTicks: 6,
+    },
+  },
   camera: {
     minZoom: 0.3,
     maxZoom: 3.0,
