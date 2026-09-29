@@ -6,6 +6,19 @@ export class SoundManager {
   private ctx: AudioContext | null = null;
   public isMuted: boolean = false;
 
+  // Precomputed noise buffers, built once and reused across every play call
+  // instead of allocating a fresh Float32Array + Math.random() fill each
+  // time. With dozens of AI-controlled creatures biting every tick this was
+  // a real allocation hot path.
+  private noiseBufferCache: Map<string, AudioBuffer> = new Map();
+
+  // Per-sound throttle: with many creatures acting per physics tick, the
+  // same effect can otherwise fire dozens of times in a single frame,
+  // stacking up audio nodes for no audible benefit. Skip a repeat play of
+  // the same sound within this window.
+  private lastPlayedAt: Map<string, number> = new Map();
+  private static readonly THROTTLE_MS = 45;
+
   private initCtx(): AudioContext | null {
     if (this.isMuted) return null;
     if (!this.ctx) {
@@ -21,9 +34,37 @@ export class SoundManager {
   }
 
   /**
+   * Returns true (and records the play) if `key` is allowed to play now;
+   * false if it played too recently and should be skipped.
+   */
+  private shouldPlay(key: string): boolean {
+    const now = performance.now();
+    const last = this.lastPlayedAt.get(key) ?? -Infinity;
+    if (now - last < SoundManager.THROTTLE_MS) return false;
+    this.lastPlayedAt.set(key, now);
+    return true;
+  }
+
+  private getNoiseBuffer(ctx: AudioContext, key: string, durationSec: number, decay: boolean): AudioBuffer {
+    let buffer = this.noiseBufferCache.get(key);
+    if (!buffer) {
+      const bufferSize = Math.floor(ctx.sampleRate * durationSec);
+      buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        const raw = Math.random() * 2 - 1;
+        output[i] = decay ? raw * Math.exp(-i / (ctx.sampleRate * 0.05)) : raw;
+      }
+      this.noiseBufferCache.set(key, buffer);
+    }
+    return buffer;
+  }
+
+  /**
    * Powerful aquatic jaw snapping / crunch sound for Shark bite
    */
   public playBiteChomp(): void {
+    if (!this.shouldPlay('biteChomp')) return;
     const ctx = this.initCtx();
     if (!ctx) return;
 
@@ -45,13 +86,7 @@ export class SoundManager {
     osc.stop(t + 0.18);
 
     // 2. High snap noise for teeth closure
-    const bufferSize = Math.floor(ctx.sampleRate * 0.08);
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
-    }
-
+    const noiseBuffer = this.getNoiseBuffer(ctx, 'biteChomp', 0.08, false);
     const whiteNoise = ctx.createBufferSource();
     whiteNoise.buffer = noiseBuffer;
 
@@ -76,6 +111,7 @@ export class SoundManager {
    * Crisp pop / nibble sound when small fish bites a plant
    */
   public playPlantNibble(): void {
+    if (!this.shouldPlay('plantNibble')) return;
     const ctx = this.initCtx();
     if (!ctx) return;
 
@@ -101,6 +137,7 @@ export class SoundManager {
    * Sound when fish or shark bites floating meat remains
    */
   public playEatMeat(): void {
+    if (!this.shouldPlay('eatMeat')) return;
     const ctx = this.initCtx();
     if (!ctx) return;
 
@@ -125,6 +162,7 @@ export class SoundManager {
    * Dramatic aquatic crunch and dissipation when a small fish dies
    */
   public playFishDeath(): void {
+    if (!this.shouldPlay('fishDeath')) return;
     const ctx = this.initCtx();
     if (!ctx) return;
 
@@ -146,13 +184,7 @@ export class SoundManager {
     osc.stop(t + 0.28);
 
     // Burst noise
-    const bufferSize = Math.floor(ctx.sampleRate * 0.15);
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.05));
-    }
-
+    const noiseBuffer = this.getNoiseBuffer(ctx, 'fishDeath', 0.15, true);
     const whiteNoise = ctx.createBufferSource();
     whiteNoise.buffer = noiseBuffer;
     const filter = ctx.createBiquadFilter();
@@ -174,6 +206,7 @@ export class SoundManager {
    * Harmonious, triumphant chord when a creature creates a clone
    */
   public playClone(): void {
+    if (!this.shouldPlay('clone')) return;
     const ctx = this.initCtx();
     if (!ctx) return;
 

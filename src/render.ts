@@ -10,6 +10,21 @@ export class Renderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
 
+  // Cached gradients reused across frames instead of being rebuilt per-plant,
+  // per-frame (createRadialGradient is one of the costlier canvas calls, and
+  // with plant counts running into the thousands this was the single
+  // biggest render cost). Keyed by glow color since only a handful of plant
+  // palettes exist; pulse animation is applied via ctx.scale instead of by
+  // rebuilding the gradient with a different radius every frame.
+  private plantGlowGradients: Map<string, CanvasGradient> = new Map();
+
+  // Current camera-visible world-space rectangle, recomputed once per
+  // render() call and used to skip drawing/looping over off-screen entities.
+  private viewLeft = 0;
+  private viewTop = 0;
+  private viewRight = 0;
+  private viewBottom = 0;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const context = canvas.getContext('2d');
@@ -17,6 +32,32 @@ export class Renderer {
       throw new Error('Failed to obtain 2D canvas rendering context');
     }
     this.ctx = context;
+  }
+
+  private updateViewport(camera: Camera, dpr: number): void {
+    const cw = this.canvas.width / dpr;
+    const ch = this.canvas.height / dpr;
+    const margin = 60; // covers largest sprite radii + glow bloom
+    this.viewLeft = -camera.x / camera.zoom - margin;
+    this.viewTop = -camera.y / camera.zoom - margin;
+    this.viewRight = this.viewLeft + cw / camera.zoom + margin * 2;
+    this.viewBottom = this.viewTop + ch / camera.zoom + margin * 2;
+  }
+
+  private isInView(x: number, y: number): boolean {
+    return x >= this.viewLeft && x <= this.viewRight && y >= this.viewTop && y <= this.viewBottom;
+  }
+
+  private getPlantGlowGradient(ctx: CanvasRenderingContext2D, glowColor: string, refRadius: number): CanvasGradient {
+    let grad = this.plantGlowGradients.get(glowColor);
+    if (!grad) {
+      grad = ctx.createRadialGradient(0, 0, 1, 0, 0, refRadius);
+      grad.addColorStop(0, glowColor);
+      grad.addColorStop(0.4, 'rgba(0, 245, 212, 0.35)');
+      grad.addColorStop(1, 'rgba(0, 245, 212, 0)');
+      this.plantGlowGradients.set(glowColor, grad);
+    }
+    return grad;
   }
 
   /**
@@ -32,6 +73,8 @@ export class Renderer {
   ): void {
     const ctx = this.ctx;
     const dpr = window.devicePixelRatio || 1;
+
+    this.updateViewport(camera, dpr);
 
     // Reset transform to identity and clear screen
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -159,6 +202,7 @@ export class Renderer {
   ): void {
     // Includes fish still mid-death-fade so their shrink/fade animation plays out.
     for (const fish of world.fishList) {
+      if (!this.isInView(fish.x, fish.y)) continue;
       const isControlled = fish === world.controlledCreature;
       this.drawCreature(ctx, fish, isControlled, time, input);
       this.drawVitalsBars(ctx, fish);
@@ -173,6 +217,7 @@ export class Renderer {
 
     ctx.save();
     for (const meat of remains) {
+      if (!this.isInView(meat.x, meat.y)) continue;
       const bob = Math.sin(time * 3 + meat.id) * 1.5;
       const decayRatio = meat.age / meat.maxAge;
       const alpha = Math.max(0.3, 1 - decayRatio * 0.7);
@@ -222,6 +267,7 @@ export class Renderer {
     ctx.save();
 
     for (const plant of world.plants) {
+      if (!this.isInView(plant.x, plant.y)) continue;
       const sway = Math.sin(time * plant.swaySpeed + plant.stemSwayPhase) * 5;
       const pulse = 1 + 0.16 * Math.sin(time * 2.2 + plant.pulsePhase);
       const r = plant.radius * pulse;
@@ -268,16 +314,18 @@ export class Renderer {
       }
 
       // Bioluminescent Crown Bulb
-      // 1. Soft radial bloom aura
-      const grad = ctx.createRadialGradient(tipX, tipY, 1, tipX, tipY, r * 2.4);
-      grad.addColorStop(0, plant.glowColor);
-      grad.addColorStop(0.4, 'rgba(0, 245, 212, 0.35)');
-      grad.addColorStop(1, 'rgba(0, 245, 212, 0)');
-
+      // 1. Soft radial bloom aura (gradient is built once per glow color and
+      // reused every frame/plant; the pulse animation is applied via a
+      // transform scale instead of recreating the gradient at a new radius)
+      const glowGrad = this.getPlantGlowGradient(ctx, plant.glowColor, plant.radius * 2.4);
+      ctx.save();
+      ctx.translate(tipX, tipY);
+      ctx.scale(pulse, pulse);
       ctx.beginPath();
-      ctx.arc(tipX, tipY, r * 2.4, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
+      ctx.arc(0, 0, plant.radius * 2.4, 0, Math.PI * 2);
+      ctx.fillStyle = glowGrad;
       ctx.fill();
+      ctx.restore();
 
       // 2. Main glowing spore bulb
       ctx.beginPath();
@@ -302,6 +350,7 @@ export class Renderer {
     ctx.save();
 
     for (const obs of world.obstacles) {
+      if (!this.isInView(obs.x, obs.y)) continue;
       const verts = obs.vertices;
       if (verts.length === 0) continue;
 
@@ -361,6 +410,7 @@ export class Renderer {
     input: InputManager
   ): void {
     for (const shark of world.sharks) {
+      if (!this.isInView(shark.x, shark.y)) continue;
       const isControlled = shark === world.controlledCreature;
       this.drawCreature(ctx, shark, isControlled, time, input);
       this.drawVitalsBars(ctx, shark);
@@ -383,17 +433,17 @@ export class Renderer {
     ctx.save();
     ctx.globalAlpha = deathAlpha;
 
+    // Single shared backdrop behind both bars (was two separate fillRects)
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    ctx.fillRect(x - 1, energyY - 1, w + 2, healthY - energyY + 3 + 2);
+
     // Energy bar
     const ef = Math.max(0, Math.min(1, creature.energyFraction));
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-    ctx.fillRect(x - 1, energyY - 1, w + 2, 4 + 2);
     ctx.fillStyle = ef < 0.2 ? '#ef4444' : ef < 0.5 ? '#facc15' : '#22c55e';
     ctx.fillRect(x, energyY, w * ef, 4);
 
     // Health bar
     const hf = Math.max(0, Math.min(1, creature.healthFraction));
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-    ctx.fillRect(x - 1, healthY - 1, w + 2, 3 + 2);
     ctx.fillStyle = `rgba(239, 68, 68, ${(0.5 + 0.5 * hf).toFixed(2)})`;
     ctx.fillRect(x, healthY, w * hf, 3);
 
@@ -410,18 +460,17 @@ export class Renderer {
     ctx.save();
     const overheadY = creature.y - creature.radius - 18;
 
-    // Glowing badge
+    // Badge (no shadowBlur: it's one of the costlier canvas ops and this
+    // renders every frame; a plain dark outline reads fine without it)
     ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'center';
-    ctx.fillStyle = creature.type === 'shark' ? '#7dd3fc' : '#fbbf24';
-    ctx.shadowColor = creature.type === 'shark' ? 'rgba(56, 189, 248, 0.8)' : 'rgba(251, 191, 36, 0.8)';
-    ctx.shadowBlur = 6;
-
     const label = creature.isCoveredByPlants
       ? '🌿 HIDDEN UNDER FLORA'
       : '▼ CONTROLLED';
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.9)';
+    ctx.fillText(label, creature.x + 1, overheadY + 1);
+    ctx.fillStyle = creature.type === 'shark' ? '#7dd3fc' : '#fbbf24';
     ctx.fillText(label, creature.x, overheadY);
-    ctx.shadowBlur = 0;
 
     // Clone progress bar
     const barWidth = 32;
@@ -843,15 +892,17 @@ export class Renderer {
     if (world.floatingTexts.length === 0) return;
 
     ctx.save();
+    ctx.textAlign = 'center';
     for (const ft of world.floatingTexts) {
+      if (!this.isInView(ft.x, ft.y)) continue;
       const alpha = Math.max(0, 1 - ft.age / ft.maxAge);
       ctx.globalAlpha = alpha;
       const s = ft.scale || 1.0;
       ctx.font = `bold ${Math.round(13 * s)}px monospace`;
+      // Plain dark outline instead of shadowBlur (no per-frame blur pass)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillText(ft.text, ft.x + 1, ft.y + 1);
       ctx.fillStyle = ft.color || '#5fff7a';
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.8)';
-      ctx.shadowBlur = 4;
       ctx.fillText(ft.text, ft.x, ft.y);
     }
     ctx.restore();
