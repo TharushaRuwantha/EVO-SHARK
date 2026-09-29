@@ -26,8 +26,13 @@ export const TOUCH_QUADRANTS = 4;
 export const TOUCH_VALUES_PER_QUADRANT = 4; // [wall, plant, prey, predator]
 export const TOUCH_SIZE = TOUCH_QUADRANTS * TOUCH_VALUES_PER_QUADRANT; // 16
 
-export const PROPRIOCEPTION_SIZE = 5;
-export const PHYSIOLOGY_SIZE = 3;
+// 7: forward_speed, lateral_speed, angular_velocity, energy_fraction,
+// health_fraction, heading_sin, heading_cos (the last two restored per audit
+// fix — internal state, the creature's own heading, not a bearing).
+export const PROPRIOCEPTION_SIZE = 7;
+// 4: hunger_signal, bite_cooldown, recent_damage, clone_progress (the last
+// one restored per audit fix — internal reproduction-charge state).
+export const PHYSIOLOGY_SIZE = 4;
 
 // Offsets into the flat sensor buffer, in write order.
 export const VISION_OFFSET = 0;
@@ -38,9 +43,9 @@ export const TOUCH_OFFSET = ELECTRO_OFFSET + ELECTRO_SIZE;
 export const PROPRIOCEPTION_OFFSET = TOUCH_OFFSET + TOUCH_SIZE;
 export const PHYSIOLOGY_OFFSET = PROPRIOCEPTION_OFFSET + PROPRIOCEPTION_SIZE;
 
-export const SENSOR_SIZE = PHYSIOLOGY_OFFSET + PHYSIOLOGY_SIZE; // 128
+export const SENSOR_SIZE = PHYSIOLOGY_OFFSET + PHYSIOLOGY_SIZE; // 131
 export const BIAS_OFFSET = SENSOR_SIZE;
-export const OBS_SIZE = SENSOR_SIZE + 1; // +1 bias input = 129
+export const OBS_SIZE = SENSOR_SIZE + 1; // +1 bias input = 132
 
 /** Human-readable section boundaries, used by the sensor-vector debug viewer. */
 export const SENSOR_SECTIONS: { name: string; offset: number; size: number }[] = [

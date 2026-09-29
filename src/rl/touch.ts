@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import { Creature } from '../creature';
 import { World } from '../world';
-import { QUADRANTS, TOUCH_VALUES_PER_QUADRANT, bearingToQuadrant } from './sensorLayout';
+import { QUADRANTS, TOUCH_SIZE, TOUCH_VALUES_PER_QUADRANT, bearingToQuadrant } from './sensorLayout';
 
 const CONTACT_TYPE_INDEX = { wall: 0, plant: 1, prey: 2, predator: 3 } as const;
 
@@ -18,6 +18,11 @@ function setContact(out: Float32Array, outOffset: number, bearing: number, headi
  * is pressed against it.
  */
 export function computeTouch(self: Creature, world: World, out: Float32Array, outOffset: number): void {
+  // Ground truth, but only for THIS tick: every slot must start at 0, or a
+  // flag set once (e.g. brushing a wall) would stay 1 forever since `out`
+  // is the creature's persistent, never-reallocated sensor buffer.
+  out.fill(0, outOffset, outOffset + TOUCH_SIZE);
+
   const wallThickness = CONFIG.world.wallThickness;
   const r = self.radius;
   const eps = 0.5;
