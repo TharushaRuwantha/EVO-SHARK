@@ -127,12 +127,19 @@ export class Renderer {
     this.updateViewport(camera, dpr);
     const lod = getLOD(camera.zoom);
 
-    // Reset transform to identity and clear screen
+    // Reset transform to identity and clear the full device-pixel buffer
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Apply camera transform (pan + zoom)
+    // Enter CSS-pixel space (1 unit = 1 CSS px) before the camera transform,
+    // since camera.x/y/zoom are computed from canvas.clientWidth/clientHeight
+    // (CSS pixels), not the device-pixel canvas.width/height. Without this,
+    // on any HiDPI display (devicePixelRatio > 1) the world only fills the
+    // top-left 1/dpr fraction of the canvas, leaving the rest black.
     ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // Apply camera transform (pan + zoom)
     camera.applyTransform(ctx);
 
     // 1. Background deep blue sea
