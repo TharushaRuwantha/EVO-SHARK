@@ -75,6 +75,15 @@ function bootstrap(): void {
         <span>💾</span> <span class="hidden lg:inline">Save</span>
       </button>
 
+      <div id="speed-control-group" title="Training speed (fast-forwards simulated time; rendering still shows every tick)" class="flex items-center gap-0.5 p-1 rounded-xl bg-white/[0.04] border border-white/10">
+        <span class="pl-1 pr-0.5 hidden md:inline">⏩</span>
+        <button data-speed="1" class="speed-btn px-2 py-1 rounded-lg font-medium text-[11px] transition-all duration-150 cursor-pointer active:scale-95">1x</button>
+        <button data-speed="2" class="speed-btn px-2 py-1 rounded-lg font-medium text-[11px] transition-all duration-150 cursor-pointer active:scale-95">2x</button>
+        <button data-speed="5" class="speed-btn px-2 py-1 rounded-lg font-medium text-[11px] transition-all duration-150 cursor-pointer active:scale-95">5x</button>
+        <button data-speed="10" class="speed-btn px-2 py-1 rounded-lg font-medium text-[11px] transition-all duration-150 cursor-pointer active:scale-95">10x</button>
+        <button data-speed="20" class="speed-btn px-2 py-1 rounded-lg font-medium text-[11px] transition-all duration-150 cursor-pointer active:scale-95">20x</button>
+      </div>
+
       <button id="btn-top-regen-plants" title="Regenerate all plants in the ocean" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
         <span>🌱</span> <span class="hidden lg:inline">Regen Plants</span>
       </button>
@@ -290,6 +299,27 @@ function bootstrap(): void {
     void simTrainer.save();
   });
 
+  // Training speed: fast-forwards simulated time relative to wall-clock
+  // time (more physics ticks run per rendered frame) rather than skipping
+  // rendering, so the sim visibly runs faster instead of just jumping.
+  let speedMultiplier = 1;
+  const speedButtons = Array.from(topBar.querySelectorAll<HTMLButtonElement>('.speed-btn'));
+  function updateSpeedButtonStyles(): void {
+    for (const btn of speedButtons) {
+      const isActive = Number(btn.dataset.speed) === speedMultiplier;
+      btn.classList.toggle('bg-cyan-500/20', isActive);
+      btn.classList.toggle('text-cyan-300', isActive);
+      btn.classList.toggle('text-slate-400', !isActive);
+    }
+  }
+  for (const btn of speedButtons) {
+    btn.addEventListener('click', () => {
+      speedMultiplier = Number(btn.dataset.speed) || 1;
+      updateSpeedButtonStyles();
+    });
+  }
+  updateSpeedButtonStyles();
+
   topBar.querySelector('#btn-top-regen-plants')?.addEventListener('click', () => {
     world.triggerRegeneratePlants();
   });
@@ -422,6 +452,7 @@ function bootstrap(): void {
   // 60 Hz Decoupled Physics Loop via Accumulator
   const tickDt = 1 / CONFIG.tick.hz;
   const maxDeltaMs = CONFIG.tick.maxDtMs;
+  const MAX_TICKS_PER_FRAME = 400; // safety cap so high speed can't hang a stalled tab
   let accumulator = 0;
   let lastTime = performance.now();
 
@@ -445,12 +476,22 @@ function bootstrap(): void {
       fpsTimer = 0;
     }
 
-    // Run fixed AI-driven physics ticks for whichever arena is on screen
+    // Run fixed AI-driven physics ticks for whichever arena is on screen.
+    // speedMultiplier fast-forwards simulated time relative to wall-clock
+    // time (more ticks run per rendered frame) rather than skipping
+    // rendering, so the sim visibly runs faster instead of jumping.
     if (!input.isPaused) {
-      accumulator += deltaSec;
-      while (accumulator >= tickDt) {
+      accumulator += deltaSec * speedMultiplier;
+      let ticksThisFrame = 0;
+      while (accumulator >= tickDt && ticksThisFrame < MAX_TICKS_PER_FRAME) {
         trainer.step();
         accumulator -= tickDt;
+        ticksThisFrame++;
+      }
+      if (ticksThisFrame >= MAX_TICKS_PER_FRAME) {
+        // Drop the backlog rather than spiral into perpetual catch-up if a
+        // frame stalls badly (e.g. tab was backgrounded) at high speed.
+        accumulator = 0;
       }
     }
 
