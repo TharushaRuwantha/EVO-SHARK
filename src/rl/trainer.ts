@@ -67,9 +67,10 @@ export class Trainer {
     if (!checkpoint) return;
 
     // A checkpoint saved under a different observation layout (e.g. the
-    // pre-refactor 16-input oracle sensors) can't be loaded into today's
-    // 129-input network — start fresh instead of crashing or silently
-    // running with garbage-shaped weights.
+    // pre-refactor 16-input oracle sensors, or an earlier version of this
+    // sensor suite before a since-fixed input count) can't be loaded into
+    // today's OBS_SIZE-input network — start fresh instead of crashing or
+    // silently running with garbage-shaped weights.
     const savedInputSize = checkpoint.shark?.network?.inputSize;
     if (savedInputSize !== OBS_SIZE) {
       // eslint-disable-next-line no-console

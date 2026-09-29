@@ -124,7 +124,7 @@ export class BrainVisualizer {
 
     const { obs, hidden, probs } = forward;
 
-    // 129 raw sensor scalars is too many to draw as individual labeled
+    // obs.length raw sensor scalars is too many to draw as individual labeled
     // nodes, so the input column shows one row per sensor MODALITY (vision,
     // smell, ...) instead of one row per number — see the separate sensor
     // vector viewer panel (toggle X) for the full per-value readout.

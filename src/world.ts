@@ -288,7 +288,7 @@ export class World {
 
       if (targetFish) {
         targetFish.health = Math.max(0, targetFish.health - controlled.stats.biteDamage);
-        targetFish.recentDamageTicks = 6;
+        targetFish.recentDamageTicks = CONFIG.sensors.physiology.recentDamageTicks;
         this.particles.emitBiteImpact(mouth.x, mouth.y);
         sound.playBiteChomp();
         controlled.biteScore += 20;

@@ -49,11 +49,18 @@ export function buildObservation(self: Creature, world: World): Float32Array {
   out[PROPRIOCEPTION_OFFSET + 2] = Math.max(-1, Math.min(1, self.angularVelocity / self.stats.maxTurnRate));
   out[PROPRIOCEPTION_OFFSET + 3] = self.energyFraction;
   out[PROPRIOCEPTION_OFFSET + 4] = self.healthFraction;
+  // Restored per audit fix: the creature's own absolute heading (not a
+  // bearing to anything) — internal state, no noise.
+  out[PROPRIOCEPTION_OFFSET + 5] = sinH;
+  out[PROPRIOCEPTION_OFFSET + 6] = cosH;
 
   // --- Physiology ---
   out[PHYSIOLOGY_OFFSET + 0] = self.hungerSignal;
   out[PHYSIOLOGY_OFFSET + 1] = Math.max(0, Math.min(1, self.biteCooldownFraction));
   out[PHYSIOLOGY_OFFSET + 2] = self.recentDamage;
+  // Restored per audit fix: internal reproduction-charge state (foodEaten /
+  // foodToClone), not a "similarity to parent" metric — no noise.
+  out[PHYSIOLOGY_OFFSET + 3] = self.cloneProgressRatio;
 
   // Bias input is constant and set once at buffer creation (see Creature).
   out[BIAS_OFFSET] = 1;

@@ -2,8 +2,9 @@ import { Creature } from './creature';
 import { SENSOR_SECTIONS, HIT_TYPES } from './rl/sensorLayout';
 
 /**
- * Scrolling live text readout of the full 129-value sensor buffer for the
- * controlled creature, grouped by modality section. This is the
+ * Scrolling live text readout of the full sensor buffer for the controlled
+ * creature (see OBS_SIZE in rl/sensorLayout.ts for the current total),
+ * grouped by modality section. This is the
  * ground-truth verification view: unlike the brain visualizer's grouped
  * sparklines, every individual scalar is shown with its label.
  *
@@ -155,10 +156,10 @@ export class SensorPanel {
       return `q${quad} ${types[i % 4]}`;
     }
     if (sectionName === 'PROPRIOCEPTION') {
-      return ['forward', 'lateral', 'angular', 'energy', 'health'][i] ?? `#${i}`;
+      return ['forward', 'lateral', 'angular', 'energy', 'health', 'heading_sin', 'heading_cos'][i] ?? `#${i}`;
     }
     if (sectionName === 'PHYSIOLOGY') {
-      return ['hunger', 'bite cd', 'dmg flash'][i] ?? `#${i}`;
+      return ['hunger', 'bite cd', 'dmg flash', 'clone_progress'][i] ?? `#${i}`;
     }
     return `#${i}`;
   }
