@@ -5,6 +5,35 @@ import { InputManager } from './input';
 import { Creature } from './creature';
 import { Plant } from './plant';
 import { MeatRemains } from './food';
+import { computeVision } from './rl/vision';
+import { computeTouch } from './rl/touch';
+import { computeElectroreception } from './rl/electroreception';
+import { computeLateralLine } from './rl/lateralLine';
+import {
+  VISION_SIZE,
+  TOUCH_SIZE,
+  TOUCH_VALUES_PER_QUADRANT,
+  ELECTRO_SIZE,
+  ELECTRO_VALUES_PER_DIRECTION,
+  LATERAL_LINE_SIZE,
+  LATERAL_LINE_DIRECTIONS,
+  QUADRANTS,
+} from './rl/sensorLayout';
+
+const HIT_COLORS: Record<string, string> = {
+  empty: 'rgba(74, 222, 128, 0.3)',
+  wall: 'rgba(148, 163, 184, 0.65)',
+  plant: 'rgba(52, 211, 153, 0.9)',
+  prey: 'rgba(251, 146, 60, 0.9)',
+  predator: 'rgba(239, 68, 68, 0.9)',
+};
+
+const QUADRANT_ANGLE_OFFSET: Record<string, number> = {
+  front: 0,
+  right: Math.PI / 2,
+  back: Math.PI,
+  left: -Math.PI / 2,
+};
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -24,6 +53,13 @@ export class Renderer {
   private viewTop = 0;
   private viewRight = 0;
   private viewBottom = 0;
+
+  // Scratch buffers reused for sense-debug recomputation (drawing only —
+  // these never touch the creature's real sensorBuffer or training data).
+  private debugVisionBuf = new Float32Array(VISION_SIZE);
+  private debugTouchBuf = new Float32Array(TOUCH_SIZE);
+  private debugElectroBuf = new Float32Array(ELECTRO_SIZE);
+  private debugLateralBuf = new Float32Array(LATERAL_LINE_SIZE);
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -120,6 +156,14 @@ export class Renderer {
 
     // 11. In-world Floating Texts
     this.drawFloatingTexts(ctx, world);
+
+    // 11b. Sensor debug overlays (off by default; C = senses, S = scent)
+    if (input.showScent) {
+      this.drawScentHeatmap(ctx, world);
+    }
+    if (input.showSenses && world.controlledCreature && !world.controlledCreature.isDead) {
+      this.drawSensesDebug(ctx, world, world.controlledCreature);
+    }
 
     // 12. World solid border (20 units thick)
     this.drawWorldBorder(ctx);
@@ -909,6 +953,117 @@ export class Renderer {
   }
 
   /**
+   * Debug overlay: world-space heatmap of the two scent fields (green =
+   * prey-scent, red = predator-scent), only over cells currently on
+   * screen. Toggle with S.
+   */
+  private drawScentHeatmap(ctx: CanvasRenderingContext2D, world: World): void {
+    const { gridW, gridH, cellSize } = world.smellField.dimensions;
+    ctx.save();
+
+    const minCx = Math.max(0, Math.floor(this.viewLeft / cellSize));
+    const maxCx = Math.min(gridW - 1, Math.floor(this.viewRight / cellSize));
+    const minCy = Math.max(0, Math.floor(this.viewTop / cellSize));
+    const maxCy = Math.min(gridH - 1, Math.floor(this.viewBottom / cellSize));
+
+    for (let cy = minCy; cy <= maxCy; cy++) {
+      for (let cx = minCx; cx <= maxCx; cx++) {
+        const x = cx * cellSize;
+        const y = cy * cellSize;
+        const prey = world.smellField.preyValueAt(x + cellSize / 2, y + cellSize / 2);
+        const predator = world.smellField.predatorValueAt(x + cellSize / 2, y + cellSize / 2);
+        if (prey < 0.02 && predator < 0.02) continue;
+
+        if (prey >= predator) {
+          ctx.fillStyle = `rgba(52, 211, 153, ${Math.min(0.6, prey * 0.6)})`;
+        } else {
+          ctx.fillStyle = `rgba(239, 68, 68, ${Math.min(0.6, predator * 0.6)})`;
+        }
+        ctx.fillRect(x, y, cellSize, cellSize);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Debug overlay for the controlled creature's non-vision-panel senses:
+   * vision rays (colored by hit type), touch contact markers, the
+   * electroreception range ring (highlighted per quadrant when it fires),
+   * and lateral-line motion arrows. Toggle with C. Recomputes each sense
+   * fresh from scratch buffers purely for visualization — it never reads
+   * or writes the creature's real sensor buffer used for training.
+   */
+  private drawSensesDebug(ctx: CanvasRenderingContext2D, world: World, creature: Creature): void {
+    ctx.save();
+
+    // --- Vision rays ---
+    const visionCfg = CONFIG.sensors.vision[creature.type];
+    const fovRad = (visionCfg.fovDeg * Math.PI) / 180;
+    const hits = computeVision(creature, world, this.debugVisionBuf, 0);
+    for (let i = 0; i < hits.length; i++) {
+      const spread = hits.length > 1 ? (i / (hits.length - 1) - 0.5) * fovRad : 0;
+      const angle = creature.heading + spread;
+      const hit = hits[i];
+      ctx.strokeStyle = HIT_COLORS[hit.hitType] ?? HIT_COLORS.empty;
+      ctx.lineWidth = hit.hitType === 'empty' ? 1 : 1.8;
+      ctx.beginPath();
+      ctx.moveTo(creature.x, creature.y);
+      ctx.lineTo(creature.x + Math.cos(angle) * hit.distance, creature.y + Math.sin(angle) * hit.distance);
+      ctx.stroke();
+    }
+
+    // --- Electroreception range ring, highlighted per quadrant when firing ---
+    const electroCfg = CONFIG.sensors.electroreception[creature.type];
+    computeElectroreception(creature, world, this.debugElectroBuf, 0);
+    for (let q = 0; q < QUADRANTS.length; q++) {
+      const presence = this.debugElectroBuf[q * ELECTRO_VALUES_PER_DIRECTION];
+      const centerAngle = creature.heading + QUADRANT_ANGLE_OFFSET[QUADRANTS[q]];
+      ctx.strokeStyle = presence > 0.05 ? `rgba(232, 121, 249, ${0.3 + presence * 0.6})` : 'rgba(148, 163, 184, 0.18)';
+      ctx.lineWidth = presence > 0.05 ? 2 : 1;
+      ctx.beginPath();
+      ctx.arc(creature.x, creature.y, electroCfg.range, centerAngle - Math.PI / 4, centerAngle + Math.PI / 4);
+      ctx.stroke();
+    }
+
+    // --- Lateral line motion arrows ---
+    computeLateralLine(creature, world, this.debugLateralBuf, 0);
+    for (let k = 0; k < LATERAL_LINE_DIRECTIONS; k++) {
+      const intensity = this.debugLateralBuf[k];
+      if (intensity < 0.02) continue;
+      const angle = creature.heading + (k * Math.PI) / 4;
+      const len = 14 + intensity * 40;
+      const baseR = creature.radius + 6;
+      const sx = creature.x + Math.cos(angle) * baseR;
+      const sy = creature.y + Math.sin(angle) * baseR;
+      ctx.strokeStyle = `rgba(56, 189, 248, ${0.4 + intensity * 0.6})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len);
+      ctx.stroke();
+    }
+
+    // --- Touch contact markers ---
+    computeTouch(creature, world, this.debugTouchBuf, 0);
+    const touchColors = ['rgba(148, 163, 184, 0.95)', 'rgba(52, 211, 153, 0.95)', 'rgba(251, 146, 60, 0.95)', 'rgba(239, 68, 68, 0.95)'];
+    for (let q = 0; q < QUADRANTS.length; q++) {
+      const centerAngle = creature.heading + QUADRANT_ANGLE_OFFSET[QUADRANTS[q]];
+      for (let t = 0; t < TOUCH_VALUES_PER_QUADRANT; t++) {
+        if (this.debugTouchBuf[q * TOUCH_VALUES_PER_QUADRANT + t] < 1) continue;
+        const mx = creature.x + Math.cos(centerAngle) * (creature.radius + 14);
+        const my = creature.y + Math.sin(centerAngle) * (creature.radius + 14);
+        ctx.beginPath();
+        ctx.arc(mx, my, 4, 0, Math.PI * 2);
+        ctx.fillStyle = touchColors[t];
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /**
    * 12. World solid border (dark navy, 20 units thick)
    */
   private drawWorldBorder(ctx: CanvasRenderingContext2D): void {
@@ -1043,6 +1198,8 @@ export class Renderer {
       input.showVelocityArrows ? 'V:on' : 'V:off',
       input.showHeadingLines ? 'H:on' : 'H:off',
       input.showBoundingCircles ? 'B:on' : 'B:off',
+      input.showSenses ? 'C:on' : 'C:off',
+      input.showScent ? 'S:on' : 'S:off',
     ].join(' ');
     ctx.fillStyle = '#64748b';
     ctx.fillText(`Overlays: ${overlays}`, x + 12, textY);
@@ -1084,7 +1241,7 @@ export class Renderer {
     ctx.fillText(popInfo, 16, bannerY + 17);
 
     ctx.textAlign = 'right';
-    const controlsText = '🤖 AI-controlled (RL training) | E:Regen Plants | R:New Generation | N:Brain View | M:Menu';
+    const controlsText = '🤖 AI-controlled (RL training) | E:Regen Plants | R:New Generation | N:Brain | X:Sensors | C:Senses | S:Scent | M:Menu';
     ctx.fillText(controlsText, cw - 16, bannerY + 17);
 
     ctx.restore();

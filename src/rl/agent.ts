@@ -26,7 +26,7 @@ export class SpeciesAgent {
     this.network = network ?? new PolicyNetwork(OBS_SIZE, CONFIG.rl.hiddenSize, ACTION_COUNT);
   }
 
-  public act(obs: number[]): { action: number; forward: ForwardResult } {
+  public act(obs: Float32Array): { action: number; forward: ForwardResult } {
     const forward = this.network.forward(obs);
     const action = this.network.sampleAction(forward.probs);
     return { action, forward };

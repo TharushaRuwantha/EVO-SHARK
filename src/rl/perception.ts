@@ -1,134 +1,62 @@
-import { CONFIG } from '../config';
 import { Creature } from '../creature';
 import { World } from '../world';
+import { computeVision } from './vision';
+import { computeLateralLine } from './lateralLine';
+import { computeElectroreception } from './electroreception';
+import { computeTouch } from './touch';
+import {
+  OBS_SIZE,
+  SMELL_OFFSET,
+  LATERAL_LINE_OFFSET,
+  ELECTRO_OFFSET,
+  TOUCH_OFFSET,
+  PROPRIOCEPTION_OFFSET,
+  PHYSIOLOGY_OFFSET,
+  BIAS_OFFSET,
+} from './sensorLayout';
 
-export const OBS_SIZE = 16;
-
-const MAX_SENSE_DIST = 600; // units; beyond this, distance reads as "not visible" (1.0)
-
-function relativeAngleParts(dx: number, dy: number, heading: number): { sin: number; cos: number } {
-  const angleToTarget = Math.atan2(dy, dx);
-  const rel = angleToTarget - heading;
-  return { sin: Math.sin(rel), cos: Math.cos(rel) };
-}
+export { OBS_SIZE };
 
 /**
- * Builds a fixed-size, normalized observation vector for a creature so a
- * single shared policy network can be used across every instance of a
- * species. Distances are relative to the creature's mouth so "in range"
- * roughly lines up with when a bite would actually connect.
+ * Builds this tick's egocentric, partial-observability sensor reading for
+ * `self` directly into its persistent per-creature buffer (no allocation).
+ * Every value here is something a body could plausibly sense: vision rays,
+ * diffusing scent, motion-detecting lateral line, short-range
+ * electroreception, contact touch, body-frame proprioception, and internal
+ * physiology. Nothing here is an oracle read of absolute world state (no
+ * raw coordinates, world-frame velocity, or "nearest X" distance/bearing
+ * outside of what a sense organ with a real field of view/range would
+ * report).
  */
-export function buildObservation(self: Creature, world: World): number[] {
-  const mouth = self.mouthPosition;
+export function buildObservation(self: Creature, world: World): Float32Array {
+  const out = self.sensorBuffer;
+
+  computeVision(self, world, out, 0);
+  world.smellField.sample8Directions(self.x, self.y, self.heading, out, SMELL_OFFSET);
+  computeLateralLine(self, world, out, LATERAL_LINE_OFFSET);
+  computeElectroreception(self, world, out, ELECTRO_OFFSET);
+  computeTouch(self, world, out, TOUCH_OFFSET);
+
+  // --- Proprioception: body-frame velocity + turn rate + internal state ---
   const maxSpeed = self.stats.maxSpeed;
+  const cosH = Math.cos(self.heading);
+  const sinH = Math.sin(self.heading);
+  const forwardSpeed = (self.vx * cosH + self.vy * sinH) / maxSpeed;
+  const lateralSpeed = (-self.vx * sinH + self.vy * cosH) / maxSpeed;
 
-  const obs = new Array<number>(OBS_SIZE).fill(0);
+  out[PROPRIOCEPTION_OFFSET + 0] = Math.max(-1, Math.min(1, forwardSpeed));
+  out[PROPRIOCEPTION_OFFSET + 1] = Math.max(-1, Math.min(1, lateralSpeed));
+  out[PROPRIOCEPTION_OFFSET + 2] = Math.max(-1, Math.min(1, self.angularVelocity / self.stats.maxTurnRate));
+  out[PROPRIOCEPTION_OFFSET + 3] = self.energyFraction;
+  out[PROPRIOCEPTION_OFFSET + 4] = self.healthFraction;
 
-  obs[0] = self.vx / maxSpeed;
-  obs[1] = self.vy / maxSpeed;
-  obs[2] = Math.sin(self.heading);
-  obs[3] = Math.cos(self.heading);
-  obs[4] = self.energy / self.stats.energyMax;
-  obs[5] = self.cloneProgressRatio;
+  // --- Physiology ---
+  out[PHYSIOLOGY_OFFSET + 0] = self.hungerSignal;
+  out[PHYSIOLOGY_OFFSET + 1] = Math.max(0, Math.min(1, self.biteCooldownFraction));
+  out[PHYSIOLOGY_OFFSET + 2] = self.recentDamage;
 
-  // --- Nearest food target ---
-  let bestFoodDist = Infinity;
-  let bestFoodDx = 0;
-  let bestFoodDy = 0;
+  // Bias input is constant and set once at buffer creation (see Creature).
+  out[BIAS_OFFSET] = 1;
 
-  if (self.type === 'shark') {
-    for (const fish of world.aliveFish) {
-      const d = Math.hypot(fish.x - mouth.x, fish.y - mouth.y);
-      if (d < bestFoodDist) {
-        bestFoodDist = d;
-        bestFoodDx = fish.x - mouth.x;
-        bestFoodDy = fish.y - mouth.y;
-      }
-    }
-  } else {
-    for (const plant of world.plants) {
-      const d = Math.hypot(plant.x - mouth.x, plant.y - mouth.y);
-      if (d < bestFoodDist) {
-        bestFoodDist = d;
-        bestFoodDx = plant.x - mouth.x;
-        bestFoodDy = plant.y - mouth.y;
-      }
-    }
-  }
-  for (const meat of world.meatRemains) {
-    const d = Math.hypot(meat.x - mouth.x, meat.y - mouth.y);
-    if (d < bestFoodDist) {
-      bestFoodDist = d;
-      bestFoodDx = meat.x - mouth.x;
-      bestFoodDy = meat.y - mouth.y;
-    }
-  }
-
-  if (bestFoodDist === Infinity) {
-    obs[6] = 1;
-    obs[7] = 0;
-    obs[8] = 0;
-  } else {
-    obs[6] = Math.min(1, bestFoodDist / MAX_SENSE_DIST);
-    const { sin, cos } = relativeAngleParts(bestFoodDx, bestFoodDy, self.heading);
-    obs[7] = sin;
-    obs[8] = cos;
-  }
-
-  // --- Nearest threat (fish only; sharks have none) ---
-  if (self.type === 'fish') {
-    let bestThreatDist = Infinity;
-    let bestDx = 0;
-    let bestDy = 0;
-    for (const shark of world.aliveSharks) {
-      const d = Math.hypot(shark.x - mouth.x, shark.y - mouth.y);
-      if (d < bestThreatDist) {
-        bestThreatDist = d;
-        bestDx = shark.x - mouth.x;
-        bestDy = shark.y - mouth.y;
-      }
-    }
-    if (bestThreatDist === Infinity) {
-      obs[9] = 1;
-    } else {
-      obs[9] = Math.min(1, bestThreatDist / MAX_SENSE_DIST);
-      const { sin, cos } = relativeAngleParts(bestDx, bestDy, self.heading);
-      obs[10] = sin;
-      obs[11] = cos;
-    }
-  } else {
-    obs[9] = 1;
-  }
-
-  // --- Nearest obstacle ---
-  let bestObsDist = Infinity;
-  let bestObsDx = 0;
-  let bestObsDy = 0;
-  for (const obstacle of world.obstacles) {
-    const d = Math.hypot(obstacle.x - mouth.x, obstacle.y - mouth.y) - obstacle.boundingRadius;
-    if (d < bestObsDist) {
-      bestObsDist = d;
-      bestObsDx = obstacle.x - mouth.x;
-      bestObsDy = obstacle.y - mouth.y;
-    }
-  }
-  if (bestObsDist === Infinity) {
-    obs[12] = 1;
-  } else {
-    obs[12] = Math.max(0, Math.min(1, bestObsDist / MAX_SENSE_DIST));
-    const { sin, cos } = relativeAngleParts(bestObsDx, bestObsDy, self.heading);
-    obs[13] = sin;
-    obs[14] = cos;
-  }
-
-  // --- Nearest wall ---
-  const wallThickness = CONFIG.world.wallThickness;
-  const distLeft = self.x - wallThickness;
-  const distRight = CONFIG.world.width - wallThickness - self.x;
-  const distTop = self.y - wallThickness;
-  const distBottom = CONFIG.world.height - wallThickness - self.y;
-  const minWallDist = Math.min(distLeft, distRight, distTop, distBottom);
-  obs[15] = Math.max(0, Math.min(1, minWallDist / MAX_SENSE_DIST));
-
-  return obs;
+  return out;
 }

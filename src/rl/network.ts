@@ -16,7 +16,7 @@ export interface PolicyNetworkJSON {
 }
 
 export interface ForwardResult {
-  obs: number[];
+  obs: Float32Array;
   hiddenPre: number[];
   hidden: number[];
   probs: number[];
@@ -59,7 +59,7 @@ export class PolicyNetwork {
     this.b2 = new Array(outputSize).fill(0);
   }
 
-  public forward(obs: number[]): ForwardResult {
+  public forward(obs: Float32Array): ForwardResult {
     const hiddenPre = new Array(this.hiddenSize).fill(0);
     for (let h = 0; h < this.hiddenSize; h++) {
       let z = this.b1[h];
@@ -78,7 +78,11 @@ export class PolicyNetwork {
     }
     const probs = softmax(logits);
 
-    return { obs, hiddenPre, hidden, probs };
+    // `obs` is the creature's persistent, reused-every-tick sensor buffer —
+    // it must be snapshotted here (not stored by reference) since this
+    // ForwardResult gets held in the trajectory buffer until the episode
+    // ends, long after the live buffer has been overwritten by later ticks.
+    return { obs: Float32Array.from(obs), hiddenPre, hidden, probs };
   }
 
   public sampleAction(probs: number[]): number {

@@ -1,25 +1,6 @@
 import { ForwardResult, PolicyNetwork } from './rl/network';
 import { Creature } from './creature';
-
-/** Short sensor labels, matching the obs[] layout built in rl/perception.ts. */
-const INPUT_LABELS = [
-  'vel x',
-  'vel y',
-  'head sin',
-  'head cos',
-  'energy',
-  'clone %',
-  'food dist',
-  'food sin',
-  'food cos',
-  'threat dist',
-  'threat sin',
-  'threat cos',
-  'obst dist',
-  'obst sin',
-  'obst cos',
-  'wall dist',
-];
+import { SENSOR_SECTIONS } from './rl/sensorLayout';
 
 /** Action labels, matching rl/actions.ts ACTIONS order. */
 const OUTPUT_LABELS = ['idle', 'thrust', 'thrust+L', 'thrust+R', 'turn L', 'turn R', 'bite'];
@@ -137,24 +118,29 @@ export class BrainVisualizer {
 
     const top = 52;
     const bottom = h - 16;
-    const inputX = 90;
-    const hiddenX = w / 2 + 10;
-    const outputX = w - 80;
+    const inputX = 60;
+    const hiddenX = 250;
+    const outputX = w - 70;
 
     const { obs, hidden, probs } = forward;
 
-    const inputY = (i: number) => top + ((bottom - top) * (i + 0.5)) / obs.length;
+    // 129 raw sensor scalars is too many to draw as individual labeled
+    // nodes, so the input column shows one row per sensor MODALITY (vision,
+    // smell, ...) instead of one row per number — see the separate sensor
+    // vector viewer panel (toggle X) for the full per-value readout.
+    const sectionY = (i: number) => top + ((bottom - top) * (i + 0.5)) / SENSOR_SECTIONS.length;
     const hiddenY = (i: number) => top + ((bottom - top) * (i + 0.5)) / hidden.length;
     const outputY = (i: number) => top + ((bottom - top) * (i + 0.5)) / probs.length;
 
     // --- Connection lines (drawn first, underneath the nodes) ---
-    // Input -> hidden, colored/weighted by the actual signal (weight * input
-    // activation) so the picture shows what's driving the hidden layer right
-    // now, not just the network's static weights.
+    // Input -> hidden, aggregated per sensor section (summed signal =
+    // weight * activation across that section's inputs) so the picture
+    // shows which modality is driving each hidden unit right now.
     let maxSignal1 = 1e-6;
-    const signals1: number[][] = network.w1.map((row, hIdx) =>
-      row.map((wgt, iIdx) => {
-        const s = wgt * obs[iIdx];
+    const signals1: number[][] = network.w1.map((row) =>
+      SENSOR_SECTIONS.map((section) => {
+        let s = 0;
+        for (let i = section.offset; i < section.offset + section.size; i++) s += row[i] * obs[i];
         maxSignal1 = Math.max(maxSignal1, Math.abs(s));
         return s;
       })
@@ -163,14 +149,14 @@ export class BrainVisualizer {
     ctx.lineCap = 'round';
     for (let hIdx = 0; hIdx < hidden.length; hIdx++) {
       const hy = hiddenY(hIdx);
-      for (let iIdx = 0; iIdx < obs.length; iIdx++) {
-        const s = signals1[hIdx][iIdx];
+      for (let sIdx = 0; sIdx < SENSOR_SECTIONS.length; sIdx++) {
+        const s = signals1[hIdx][sIdx];
         const mag = Math.abs(s) / maxSignal1;
         if (mag < 0.08) continue; // skip near-zero links to keep it legible
         ctx.strokeStyle = s >= 0 ? `rgba(52, 211, 153, ${0.12 + mag * 0.55})` : `rgba(248, 113, 113, ${0.12 + mag * 0.55})`;
         ctx.lineWidth = 0.5 + mag * 1.8;
         ctx.beginPath();
-        ctx.moveTo(inputX + 8, inputY(iIdx));
+        ctx.moveTo(inputX + 8, sectionY(sIdx));
         ctx.lineTo(hiddenX - 6, hy);
         ctx.stroke();
       }
@@ -201,22 +187,36 @@ export class BrainVisualizer {
       }
     }
 
-    // --- Input nodes ---
+    // --- Input rows: one per sensor modality, each a mini sparkline of its
+    // raw values (a "how excited is this sense right now" bar strip) ---
     ctx.font = '9px monospace';
-    for (let i = 0; i < obs.length; i++) {
-      const y = inputY(i);
-      const v = Math.max(-1, Math.min(1, obs[i]));
+    const sparkW = 110;
+    const sparkH = 10;
+    for (let sIdx = 0; sIdx < SENSOR_SECTIONS.length; sIdx++) {
+      const section = SENSOR_SECTIONS[sIdx];
+      const y = sectionY(sIdx);
+
+      let avgMag = 0;
+      for (let i = section.offset; i < section.offset + section.size; i++) avgMag += Math.abs(obs[i]);
+      avgMag /= section.size;
+
       ctx.beginPath();
       ctx.arc(inputX, y, 4.5, 0, Math.PI * 2);
-      ctx.fillStyle = lerpColor(v, [96, 165, 250], [71, 85, 105], [251, 191, 36]);
+      ctx.fillStyle = lerpColor(avgMag, [71, 85, 105], [71, 85, 105], [251, 191, 36]);
       ctx.fill();
 
       ctx.textAlign = 'right';
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText(INPUT_LABELS[i] ?? `in${i}`, inputX - 10, y + 3);
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#475569';
-      ctx.fillText(v.toFixed(2), inputX + 10, y + 3);
+      ctx.fillText(`${section.name} (${section.size})`, inputX - 10, y - 4);
+
+      // Sparkline: one thin bar per value, height proportional to |value|.
+      const barW = Math.max(1, sparkW / section.size);
+      for (let k = 0; k < section.size; k++) {
+        const v = Math.max(-1, Math.min(1, obs[section.offset + k]));
+        const barH = Math.max(1, Math.abs(v) * sparkH);
+        ctx.fillStyle = v >= 0 ? 'rgba(52, 211, 153, 0.8)' : 'rgba(248, 113, 113, 0.8)';
+        ctx.fillRect(inputX + 10 + k * barW, y + 6 - barH, Math.max(0.75, barW - 0.3), barH);
+      }
     }
 
     // --- Hidden nodes ---

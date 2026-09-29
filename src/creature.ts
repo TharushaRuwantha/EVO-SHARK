@@ -1,5 +1,6 @@
 import { CONFIG, SpeciesStats, SpeciesType } from './config';
 import { Obstacle, resolveCreatureObstacleCollision } from './obstacle';
+import { OBS_SIZE, BIAS_OFFSET } from './rl/sensorLayout';
 
 export interface CreatureInput {
   thrustInput: number; // [0, 1]
@@ -19,6 +20,12 @@ export class Creature {
   public vx: number = 0;
   public vy: number = 0;
   public heading: number; // Radians, 0 = pointing right along +X
+  public angularVelocity: number = 0; // Radians/sec actually applied last tick (for proprioception)
+
+  // Persistent per-tick sensor reading buffer (egocentric sensor suite; see
+  // rl/perception.ts). Reused every tick — never reallocated — so building
+  // an observation costs no per-tick allocation. The bias slot is constant.
+  public readonly sensorBuffer: Float32Array = new Float32Array(OBS_SIZE);
   public isControlled: boolean = false;
   public isDead: boolean = false;
   public isCoveredByPlants: boolean = false; // Concealed under plant foliage
@@ -52,6 +59,7 @@ export class Creature {
     this.foodToClone = this.stats.foodToClone;
     this.energy = this.stats.energyMax;
     this.health = this.stats.maxHealth;
+    this.sensorBuffer[BIAS_OFFSET] = 1;
   }
 
   // --- Physiology, computed every tick (see World.tickAI) ---
@@ -150,6 +158,9 @@ export class Creature {
     if (input.turnInput !== 0) {
       this.heading += input.turnInput * maxTurnRate * dt;
       this.heading = Math.atan2(Math.sin(this.heading), Math.cos(this.heading));
+      this.angularVelocity = input.turnInput * maxTurnRate;
+    } else {
+      this.angularVelocity = 0;
     }
 
     // 2. vx += cos(heading) * thrustInput * maxThrust * dt

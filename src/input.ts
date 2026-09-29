@@ -5,6 +5,8 @@ export interface DebugToggles {
   velocity: boolean;
   heading: boolean;
   bounds: boolean;
+  senses: boolean; // vision rays + touch + electroreception + lateral line, for the controlled creature
+  scent: boolean; // world-space scent field heatmap
 }
 
 export class InputManager {
@@ -14,6 +16,8 @@ export class InputManager {
     velocity: false,
     heading: false,
     bounds: false,
+    senses: false,
+    scent: false,
   };
 
   public isPaused: boolean = false;
@@ -31,6 +35,12 @@ export class InputManager {
   get showBoundingCircles(): boolean {
     return this.debugToggles.bounds;
   }
+  get showSenses(): boolean {
+    return this.debugToggles.senses;
+  }
+  get showScent(): boolean {
+    return this.debugToggles.scent;
+  }
 
   private biteTriggerPending: boolean = false;
 
@@ -42,6 +52,7 @@ export class InputManager {
   public onRegeneratePlants?: () => void;
   public onToggleViewMode?: () => void;
   public onToggleBrainViz?: () => void;
+  public onToggleSensorPanel?: () => void;
 
   constructor() {
     this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -97,6 +108,12 @@ export class InputManager {
       this.debugToggles.bounds = !this.debugToggles.bounds;
     } else if (e.code === 'KeyN') {
       this.onToggleBrainViz?.();
+    } else if (e.code === 'KeyC') {
+      this.debugToggles.senses = !this.debugToggles.senses;
+    } else if (e.code === 'KeyS') {
+      this.debugToggles.scent = !this.debugToggles.scent;
+    } else if (e.code === 'KeyX') {
+      this.onToggleSensorPanel?.();
     }
   }
 
