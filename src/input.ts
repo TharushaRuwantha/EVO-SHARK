@@ -41,6 +41,7 @@ export class InputManager {
   public onBiteTriggered?: () => void;
   public onRegeneratePlants?: () => void;
   public onToggleViewMode?: () => void;
+  public onToggleBrainViz?: () => void;
 
   constructor() {
     this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -94,6 +95,8 @@ export class InputManager {
       this.debugToggles.heading = !this.debugToggles.heading;
     } else if (e.code === 'KeyB') {
       this.debugToggles.bounds = !this.debugToggles.bounds;
+    } else if (e.code === 'KeyN') {
+      this.onToggleBrainViz?.();
     }
   }
 

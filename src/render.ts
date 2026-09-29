@@ -1084,7 +1084,7 @@ export class Renderer {
     ctx.fillText(popInfo, 16, bannerY + 17);
 
     ctx.textAlign = 'right';
-    const controlsText = '🤖 AI-controlled (RL training) | E:Regen Plants | R:New Generation | M:Menu';
+    const controlsText = '🤖 AI-controlled (RL training) | E:Regen Plants | R:New Generation | N:Brain View | M:Menu';
     ctx.fillText(controlsText, cw - 16, bannerY + 17);
 
     ctx.restore();

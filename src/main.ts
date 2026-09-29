@@ -7,6 +7,7 @@ import { Renderer } from './render';
 import { ActorShowcase, PilotTarget } from './showcase';
 import { sound } from './audio';
 import { Trainer } from './rl/trainer';
+import { BrainVisualizer } from './brainviz';
 
 type ViewMode = 'simulation' | 'showcase' | 'free';
 
@@ -89,6 +90,10 @@ function bootstrap(): void {
         🔊
       </button>
 
+      <button id="btn-toggle-brain" title="Show/hide the selected creature's neural network (N)" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>🧠</span> <span class="hidden lg:inline">Brain</span>
+      </button>
+
       <button id="btn-toggle-help" title="About this training mode" class="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
         ❓
       </button>
@@ -129,9 +134,13 @@ function bootstrap(): void {
           <span class="text-slate-400">Force a new generation</span>
           <span class="text-slate-100 font-medium">R</span>
         </div>
-        <div class="flex justify-between items-center py-2">
+        <div class="flex justify-between items-center py-2 border-b border-white/[0.05]">
           <span class="text-slate-400">Camera pan / zoom / follow</span>
           <span class="text-slate-300">Wheel · middle drag · F</span>
+        </div>
+        <div class="flex justify-between items-center py-2">
+          <span class="text-slate-400">Show/hide selected creature's brain</span>
+          <span class="text-slate-100 font-medium">N</span>
         </div>
       </div>
 
@@ -148,6 +157,7 @@ function bootstrap(): void {
   const input = new InputManager();
   const camera = new Camera(canvas, input);
   const renderer = new Renderer(canvas);
+  const brainViz = new BrainVisualizer(simWrapper);
 
   // Main simulation world (#/sim), persistently trained and checkpointed, and
   // an exact, fully independent copy mounted at (#/free) for separate,
@@ -283,6 +293,10 @@ function bootstrap(): void {
     }
   });
 
+  const brainBtn = topBar.querySelector('#btn-toggle-brain');
+  brainBtn?.addEventListener('click', () => brainViz.toggle());
+  input.onToggleBrainViz = () => brainViz.toggle();
+
   const helpBtn = topBar.querySelector('#btn-toggle-help');
   const closeHelpBtn = helpModal.querySelector('#btn-close-help');
   const gotItHelpBtn = helpModal.querySelector('#btn-help-got-it');
@@ -405,6 +419,17 @@ function bootstrap(): void {
     if (currentView === 'simulation' || currentView === 'free') {
       renderer.render(world, camera, input, currentFps, currentTime / 1000);
       updateTrainingStatsUI();
+
+      if (brainViz.isVisible) {
+        const controlled = world.controlledCreature;
+        if (controlled && !controlled.isDead) {
+          const agent = controlled.type === 'shark' ? trainer.sharkAgent : trainer.fishAgent;
+          const latest = trainer.getLastForward(controlled.id);
+          if (latest) {
+            brainViz.render(controlled, agent.network, latest.forward, latest.action, currentTime);
+          }
+        }
+      }
     }
 
     requestAnimationFrame(loop);
