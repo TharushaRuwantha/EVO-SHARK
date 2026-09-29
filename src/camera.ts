@@ -14,6 +14,14 @@ export class Camera {
   private canvas: HTMLCanvasElement;
   private input: InputManager;
 
+  // Tracks whether the most recent pointer-down/up pair moved enough to
+  // count as a pan rather than a plain click, so a canvas click handler
+  // (e.g. "select this creature") can tell a drag-to-explore gesture apart
+  // from an actual click on a creature.
+  private dragAccum: number = 0;
+  private didDragSincePointerDown: boolean = false;
+  private static readonly DRAG_CLICK_THRESHOLD_PX = 5;
+
   constructor(canvas: HTMLCanvasElement, input: InputManager) {
     this.canvas = canvas;
     this.input = input;
@@ -42,7 +50,12 @@ export class Camera {
   }
 
   /**
-   * Fit the whole 2000x1200 world onto the canvas, centered.
+   * Fill the whole viewport with the ocean, edge-to-edge (a "cover" fit,
+   * not "contain"): the world is scaled up just enough that it always
+   * spans the full screen with no letterboxed border, at the cost of
+   * cropping some of the world off-screen when its aspect ratio doesn't
+   * match the window's. That's fine here since panning is always available
+   * to explore the cropped areas.
    */
   public fitToScreen(): void {
     const cw = this.canvas.clientWidth || window.innerWidth;
@@ -51,8 +64,7 @@ export class Camera {
 
     const scaleX = cw / CONFIG.world.width;
     const scaleY = ch / CONFIG.world.height;
-    // Leave a small 3% margin around edges
-    const fitScale = Math.min(scaleX, scaleY) * 0.94;
+    const fitScale = Math.max(scaleX, scaleY);
 
     this.zoom = Math.max(CONFIG.camera.minZoom, Math.min(CONFIG.camera.maxZoom, fitScale));
     this.x = (cw - CONFIG.world.width * this.zoom) / 2;
@@ -127,15 +139,17 @@ export class Camera {
   }
 
   private handleMouseDown(e: MouseEvent): void {
-    // Middle-drag (button 1) or Space-drag (button 0 with Space pressed)
+    // Any plain left-click-drag pans the camera so the map can be explored
+    // freely, in addition to the classic middle-drag / Space-drag.
     const isMiddle = e.button === 1;
-    const isSpaceDrag = e.button === 0 && this.input.isSpacePressed();
+    const isLeftDrag = e.button === 0;
 
-    if (isMiddle || isSpaceDrag) {
+    if (isMiddle || isLeftDrag) {
       this.isDragging = true;
+      this.dragAccum = 0;
       this.lastMouseX = e.clientX;
       this.lastMouseY = e.clientY;
-      e.preventDefault();
+      if (isMiddle) e.preventDefault();
     }
   }
 
@@ -146,6 +160,7 @@ export class Camera {
     const dy = e.clientY - this.lastMouseY;
     this.lastMouseX = e.clientX;
     this.lastMouseY = e.clientY;
+    this.dragAccum += Math.abs(dx) + Math.abs(dy);
 
     this.x += dx;
     this.y += dy;
@@ -158,8 +173,26 @@ export class Camera {
 
   private handleMouseUp(e: MouseEvent): void {
     if (this.isDragging && (e.button === 1 || e.button === 0)) {
+      this.didDragSincePointerDown = this.dragAccum > Camera.DRAG_CLICK_THRESHOLD_PX;
       this.isDragging = false;
     }
+  }
+
+  /**
+   * Whether the pointer moved far enough between its last down/up pair to
+   * count as a map-panning drag rather than a click. Consuming it resets
+   * the flag, so a canvas click handler can call this once per click to
+   * decide whether to treat that click as a selection or ignore it because
+   * the user was just exploring the map.
+   */
+  public consumeDidDrag(): boolean {
+    const v = this.didDragSincePointerDown;
+    this.didDragSincePointerDown = false;
+    return v;
+  }
+
+  public get isPanning(): boolean {
+    return this.isDragging;
   }
 
   private handleContextMenu(e: MouseEvent): void {
