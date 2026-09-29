@@ -48,6 +48,12 @@ export class Trainer {
   private readonly persist: boolean;
   private lastAutosave = 0;
 
+  // Latest forward pass per creature, kept around only so the brain
+  // visualizer can read what a creature "saw" and decided without the
+  // renderer having to duplicate a forward pass itself. Entries are dropped
+  // as soon as a creature's trajectory is flushed (death or gen reset).
+  private lastForward: Map<number, { forward: ForwardResult; action: number }> = new Map();
+
   constructor(world: World, options: { persist: boolean } = { persist: true }) {
     this.world = world;
     this.sharkAgent = new SpeciesAgent();
@@ -100,6 +106,7 @@ export class Trainer {
   private flushCreature(creature: Creature, finalReward: number): void {
     const steps = this.pending.get(creature.id);
     this.pending.delete(creature.id);
+    this.lastForward.delete(creature.id);
     if (!steps || steps.length === 0) return;
     steps[steps.length - 1].reward += finalReward;
     this.agentFor(creature).learnFromEpisode(steps);
@@ -152,6 +159,7 @@ export class Trainer {
 
       if (!this.pending.has(id)) this.pending.set(id, []);
       this.pending.get(id)!.push({ forward: acted.forward, action: acted.action, reward });
+      this.lastForward.set(id, { forward: acted.forward, action: acted.action });
 
       if (creature.isDead && wasAlive.has(id)) {
         this.flushCreature(creature, CONFIG.rl.deathPenalty);
@@ -179,9 +187,15 @@ export class Trainer {
       if (!creature.isDead) this.flushCreature(creature, 0);
     }
     this.pending.clear();
+    this.lastForward.clear();
 
     this.generation++;
     this.world.reset();
+  }
+
+  /** The most recent forward pass + sampled action for a creature, if it acted this tick. */
+  public getLastForward(creatureId: number): { forward: ForwardResult; action: number } | undefined {
+    return this.lastForward.get(creatureId);
   }
 
   public getStats(): TrainerStats {
