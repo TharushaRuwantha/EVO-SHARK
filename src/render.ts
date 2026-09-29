@@ -35,6 +35,20 @@ const QUADRANT_ANGLE_OFFSET: Record<string, number> = {
   left: -Math.PI / 2,
 };
 
+/**
+ * Zoom-based level of detail: at low zoom, full-detail sprites (fins,
+ * shadows, gradients, debug overlays) are both unreadable and needlessly
+ * expensive across many creatures/plants/obstacles on screen at once.
+ * This affects rendering ONLY — it never touches simulation/sensor state.
+ */
+export type LOD = 'low' | 'mid' | 'high';
+
+export function getLOD(zoom: number): LOD {
+  if (zoom < 0.6) return 'low';
+  if (zoom <= 1.5) return 'mid';
+  return 'high';
+}
+
 export class Renderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -111,6 +125,7 @@ export class Renderer {
     const dpr = window.devicePixelRatio || 1;
 
     this.updateViewport(camera, dpr);
+    const lod = getLOD(camera.zoom);
 
     // Reset transform to identity and clear screen
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -129,44 +144,47 @@ export class Renderer {
     }
 
     // 3. Small Fish (Prey) - LAYERED UNDER PLANTS so foliage obscures and conceals them!
-    this.drawSmallFishLayer(ctx, world, time, input);
+    this.drawSmallFishLayer(ctx, world, time, input, lod);
 
     // 4. Meat Remains (fish carcasses)
     this.drawMeatRemains(ctx, world.meatRemains, time);
 
     // 5. Upgraded Bioluminescent Plants (Drawn ON TOP of small fish!)
-    this.drawPlants(ctx, world, time);
+    this.drawPlants(ctx, world, time, lod);
 
     // 6. Obstacles with drop shadow
-    this.drawObstacles(ctx, world);
+    this.drawObstacles(ctx, world, lod);
 
     // 7. Sharks (Predators - swimming above the seabed flora)
-    this.drawSharksLayer(ctx, world, time, input);
+    this.drawSharksLayer(ctx, world, time, input, lod);
 
     // 8. Controlled Creature Overhead HUD/Badge
     if (world.controlledCreature && !world.controlledCreature.isDead) {
       this.drawControlledOverheadUI(ctx, world.controlledCreature);
     }
 
-    // 9. Bite Target Indicators (with camouflage awareness)
-    this.drawBiteTargetCue(ctx, world);
-
     // 10. Particles (blood clouds, bubbles, spores, sparks)
     world.particles.draw(ctx);
 
-    // 11. In-world Floating Texts
-    this.drawFloatingTexts(ctx, world);
-
-    // 11b. Sensor debug overlays (off by default; C = senses, S = scent)
-    if (input.showScent) {
-      this.drawScentHeatmap(ctx, world);
-    }
-    if (input.showSenses && world.controlledCreature && !world.controlledCreature.isDead) {
-      this.drawSensesDebug(ctx, world, world.controlledCreature);
+    // 11. In-world Floating Texts (disabled at low LOD)
+    if (lod !== 'low') {
+      this.drawFloatingTexts(ctx, world);
     }
 
-    // 12. World solid border (20 units thick)
-    this.drawWorldBorder(ctx);
+    // 11b. Sensor debug overlays (off by default; C = senses, S = scent).
+    // Always disabled at low LOD regardless of toggle state — unreadable
+    // and wasteful at that scale.
+    if (lod !== 'low') {
+      if (input.showScent) {
+        this.drawScentHeatmap(ctx, world);
+      }
+      if (input.showSenses && world.controlledCreature && !world.controlledCreature.isDead) {
+        this.drawSensesDebug(ctx, world, world.controlledCreature);
+      }
+    }
+
+    // 12. World solid border (20 units thick, or a thin 1px line at low LOD)
+    this.drawWorldBorder(ctx, lod);
 
     ctx.restore();
 
@@ -242,14 +260,15 @@ export class Renderer {
     ctx: CanvasRenderingContext2D,
     world: World,
     time: number,
-    input: InputManager
+    input: InputManager,
+    lod: LOD
   ): void {
     // Includes fish still mid-death-fade so their shrink/fade animation plays out.
     for (const fish of world.fishList) {
       if (!this.isInView(fish.x, fish.y)) continue;
       const isControlled = fish === world.controlledCreature;
-      this.drawCreature(ctx, fish, isControlled, time, input);
-      this.drawVitalsBars(ctx, fish);
+      this.drawCreature(ctx, fish, isControlled, time, input, lod);
+      this.drawVitalsBars(ctx, fish, lod);
     }
   }
 
@@ -307,8 +326,21 @@ export class Renderer {
    * 5. Enhanced Plants: Bioluminescent swaying kelp, fronds, and glowing spore bulbs
    * Rendered ON TOP of small fish, physically covering and camouflaging them!
    */
-  private drawPlants(ctx: CanvasRenderingContext2D, world: World, time: number): void {
+  private drawPlants(ctx: CanvasRenderingContext2D, world: World, time: number, lod: LOD): void {
     ctx.save();
+
+    if (lod === 'low') {
+      // Solid dot only, no stem/fronds/glow/pulse.
+      for (const plant of world.plants) {
+        if (!this.isInView(plant.x, plant.y)) continue;
+        ctx.beginPath();
+        ctx.arc(plant.x, plant.y, plant.radius, 0, Math.PI * 2);
+        ctx.fillStyle = plant.colorTone;
+        ctx.fill();
+      }
+      ctx.restore();
+      return;
+    }
 
     for (const plant of world.plants) {
       if (!this.isInView(plant.x, plant.y)) continue;
@@ -390,7 +422,7 @@ export class Renderer {
   /**
    * 6. Obstacles: Gray-green rock polygons with subtle drop shadows
    */
-  private drawObstacles(ctx: CanvasRenderingContext2D, world: World): void {
+  private drawObstacles(ctx: CanvasRenderingContext2D, world: World, lod: LOD): void {
     ctx.save();
 
     for (const obs of world.obstacles) {
@@ -398,15 +430,17 @@ export class Renderer {
       const verts = obs.vertices;
       if (verts.length === 0) continue;
 
-      // Drop shadow (offset by +8, +8)
-      ctx.beginPath();
-      ctx.moveTo(verts[0].x + 8, verts[0].y + 8);
-      for (let i = 1; i < verts.length; i++) {
-        ctx.lineTo(verts[i].x + 8, verts[i].y + 8);
+      // Drop shadow (offset by +8, +8) — skipped entirely at low LOD.
+      if (lod !== 'low') {
+        ctx.beginPath();
+        ctx.moveTo(verts[0].x + 8, verts[0].y + 8);
+        for (let i = 1; i < verts.length; i++) {
+          ctx.lineTo(verts[i].x + 8, verts[i].y + 8);
+        }
+        ctx.closePath();
+        ctx.fillStyle = CONFIG.colors.obstacleShadow;
+        ctx.fill();
       }
-      ctx.closePath();
-      ctx.fillStyle = CONFIG.colors.obstacleShadow;
-      ctx.fill();
 
       // Main rock polygon
       ctx.beginPath();
@@ -416,19 +450,27 @@ export class Renderer {
       }
       ctx.closePath();
 
-      // Gradient rock texture
-      const grad = ctx.createLinearGradient(obs.x - obs.radius, obs.y - obs.radius, obs.x + obs.radius, obs.y + obs.radius);
-      grad.addColorStop(0, '#5a6b63');
-      grad.addColorStop(0.5, CONFIG.colors.obstacle);
-      grad.addColorStop(1, '#334139');
-
-      ctx.fillStyle = grad;
+      if (lod === 'high') {
+        // Gradient rock texture
+        const grad = ctx.createLinearGradient(obs.x - obs.radius, obs.y - obs.radius, obs.x + obs.radius, obs.y + obs.radius);
+        grad.addColorStop(0, '#5a6b63');
+        grad.addColorStop(0.5, CONFIG.colors.obstacle);
+        grad.addColorStop(1, '#334139');
+        ctx.fillStyle = grad;
+      } else {
+        // Flat fill at low/mid LOD — no gradient.
+        ctx.fillStyle = CONFIG.colors.obstacle;
+      }
       ctx.fill();
+
+      if (lod === 'low') continue; // no outline/facets at low LOD
 
       // Outline
       ctx.strokeStyle = '#27332d';
       ctx.lineWidth = 2.5;
       ctx.stroke();
+
+      if (lod !== 'high') continue; // no facet highlights below high LOD
 
       // Facet interior highlights
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
@@ -451,13 +493,14 @@ export class Renderer {
     ctx: CanvasRenderingContext2D,
     world: World,
     time: number,
-    input: InputManager
+    input: InputManager,
+    lod: LOD
   ): void {
     for (const shark of world.sharks) {
       if (!this.isInView(shark.x, shark.y)) continue;
       const isControlled = shark === world.controlledCreature;
-      this.drawCreature(ctx, shark, isControlled, time, input);
-      this.drawVitalsBars(ctx, shark);
+      this.drawCreature(ctx, shark, isControlled, time, input, lod);
+      this.drawVitalsBars(ctx, shark, lod);
     }
   }
 
@@ -465,7 +508,9 @@ export class Renderer {
    * Energy (green/yellow/red, 4px) and health (red, 3px) bars stacked above
    * a creature. Fades out along with the creature's death animation.
    */
-  private drawVitalsBars(ctx: CanvasRenderingContext2D, creature: Creature): void {
+  private drawVitalsBars(ctx: CanvasRenderingContext2D, creature: Creature, lod: LOD): void {
+    if (lod === 'low') return; // unreadable and unnecessary at this scale
+
     const deathAlpha = creature.isDead ? Math.max(0, 1 - creature.deathFadeTicks / 30) : 1;
     if (deathAlpha <= 0) return;
 
@@ -543,7 +588,8 @@ export class Renderer {
     creature: Creature,
     isControlled: boolean,
     time: number,
-    input: InputManager
+    input: InputManager,
+    lod: LOD
   ): void {
     ctx.save();
     ctx.translate(creature.x, creature.y);
@@ -559,6 +605,46 @@ export class Renderer {
 
     const isShark = creature.type === 'shark';
     const r = creature.radius;
+
+    // --- LOW LOD: a filled circle, nothing else. ---
+    if (lod === 'low') {
+      ctx.fillStyle = isShark ? CONFIG.colors.shark : CONFIG.colors.fish;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    // --- MID LOD: simple teardrop silhouette, thin outline, no fins/tail/eyes. ---
+    if (lod === 'mid') {
+      if (!creature.isDead && !isShark && creature.isCoveredByPlants) {
+        ctx.globalAlpha *= isControlled ? 0.7 : 0.4; // keep the camouflage cue readable
+      }
+
+      ctx.beginPath();
+      if (isShark) {
+        ctx.moveTo(r * 1.8, 0);
+        ctx.bezierCurveTo(r * 1.2, -r * 1.0, -r * 0.5, -r * 1.0, -r * 1.4, 0);
+        ctx.bezierCurveTo(-r * 0.5, r * 1.0, r * 1.2, r * 1.0, r * 1.8, 0);
+      } else {
+        ctx.moveTo(r * 1.6, 0);
+        ctx.bezierCurveTo(r * 0.8, -r * 1.05, -r * 0.6, -r * 0.9, -r * 1.2, 0);
+        ctx.bezierCurveTo(-r * 0.6, r * 0.9, r * 0.8, r * 1.05, r * 1.6, 0);
+      }
+      ctx.closePath();
+
+      ctx.fillStyle = isShark ? CONFIG.colors.shark : CONFIG.colors.fish;
+      ctx.fill();
+      ctx.strokeStyle = isControlled ? (isShark ? '#38bdf8' : '#fbbf24') : isShark ? '#1e293b' : '#9a3412';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      this.drawCreatureDebugOverlays(ctx, creature, input, r);
+      ctx.restore();
+      return;
+    }
+
+    // --- HIGH LOD: full detail below (fins, tails, eyes, jaws, aura, debug overlays). ---
     const speed = creature.speed;
 
     // Swimming tail waggle only wiggles when moving; stationary creature is at rest
@@ -791,7 +877,13 @@ export class Renderer {
       ctx.restore();
     }
 
-    // Debug overlays
+    this.drawCreatureDebugOverlays(ctx, creature, input, r);
+
+    ctx.restore();
+  }
+
+  /** Bounding circle / heading line / velocity arrow debug overlays, shared by mid and high LOD. */
+  private drawCreatureDebugOverlays(ctx: CanvasRenderingContext2D, creature: Creature, input: InputManager, r: number): void {
     if (input.showBoundingCircles) {
       ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
       ctx.lineWidth = 1;
@@ -809,7 +901,7 @@ export class Renderer {
       ctx.stroke();
     }
 
-    if (input.showVelocityArrows && speed > 2) {
+    if (input.showVelocityArrows && creature.speed > 2) {
       ctx.strokeStyle = 'rgba(234, 179, 8, 0.95)';
       ctx.lineWidth = 1.8;
       ctx.beginPath();
@@ -817,116 +909,6 @@ export class Renderer {
       ctx.lineTo(creature.vx * 0.4, creature.vy * 0.4);
       ctx.stroke();
     }
-
-    ctx.restore();
-  }
-
-  /**
-   * 9. Visual targeting indicator when prey/plant/meat is within biting range
-   */
-  private drawBiteTargetCue(ctx: CanvasRenderingContext2D, world: World): void {
-    const controlled = world.controlledCreature;
-    if (!controlled || controlled.isDead) return;
-
-    const inRange = world.isTargetInBiteRange();
-    if (!inRange) return;
-
-    ctx.save();
-    const mouth = controlled.mouthPosition;
-
-    if (controlled.type === 'shark') {
-      // 1. Shark targeting Small Fish
-      for (const fish of world.aliveFish) {
-        const effectiveRange = fish.isCoveredByPlants
-          ? CONFIG.species.shark.biteRange * 0.35
-          : CONFIG.species.shark.biteRange;
-
-        const dist = Math.hypot(mouth.x - fish.x, mouth.y - fish.y);
-        if (dist <= effectiveRange + fish.radius) {
-          ctx.strokeStyle = fish.isCoveredByPlants ? 'rgba(251, 146, 60, 0.9)' : 'rgba(244, 63, 94, 0.9)';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([4, 4]);
-
-          ctx.beginPath();
-          ctx.arc(fish.x, fish.y, fish.radius + 12, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Reticle crosshairs
-          ctx.beginPath();
-          ctx.moveTo(fish.x - fish.radius - 14, fish.y);
-          ctx.lineTo(fish.x + fish.radius + 14, fish.y);
-          ctx.moveTo(fish.x, fish.y - fish.radius - 14);
-          ctx.lineTo(fish.x, fish.y + fish.radius + 14);
-          ctx.stroke();
-
-          // Overhead Prompt
-          ctx.font = 'bold 10px monospace';
-          ctx.fillStyle = fish.isCoveredByPlants ? '#fb923c' : '#f43f5e';
-          ctx.textAlign = 'center';
-          const cueText = fish.isCoveredByPlants
-            ? '[SPACE] CHOMP (IN FLORA)'
-            : '[SPACE] BITE TO KILL!';
-          ctx.fillText(cueText, fish.x, fish.y - fish.radius - 16);
-          break;
-        }
-      }
-
-      // 2. Shark targeting Meat Remains
-      for (const meat of world.meatRemains) {
-        const dist = Math.hypot(mouth.x - meat.x, mouth.y - meat.y);
-        if (dist <= CONFIG.species.shark.biteRange + meat.radius) {
-          ctx.strokeStyle = 'rgba(244, 63, 94, 0.85)';
-          ctx.lineWidth = 1.8;
-          ctx.beginPath();
-          ctx.arc(meat.x, meat.y, meat.radius + 8, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.font = 'bold 9px monospace';
-          ctx.fillStyle = '#fb7185';
-          ctx.textAlign = 'center';
-          ctx.fillText('[SPACE] EAT MEAT', meat.x, meat.y - meat.radius - 10);
-          break;
-        }
-      }
-    } else {
-      // Small Fish targeting: Meat or Plant
-      for (const meat of world.meatRemains) {
-        const dist = Math.hypot(mouth.x - meat.x, mouth.y - meat.y);
-        if (dist <= CONFIG.species.fish.biteRange + meat.radius) {
-          ctx.strokeStyle = 'rgba(251, 146, 60, 0.9)';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(meat.x, meat.y, meat.radius + 8, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.font = 'bold 9px monospace';
-          ctx.fillStyle = '#fb923c';
-          ctx.textAlign = 'center';
-          ctx.fillText('[SPACE] BITE MEAT', meat.x, meat.y - meat.radius - 10);
-          ctx.restore();
-          return;
-        }
-      }
-
-      for (const plant of world.plants) {
-        const dist = Math.hypot(mouth.x - plant.x, mouth.y - plant.y);
-        if (dist <= CONFIG.species.fish.biteRange + plant.radius) {
-          ctx.strokeStyle = 'rgba(95, 255, 122, 0.95)';
-          ctx.lineWidth = 1.8;
-          ctx.beginPath();
-          ctx.arc(plant.x, plant.y, plant.radius + 8, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.font = 'bold 9px monospace';
-          ctx.fillStyle = '#5fff7a';
-          ctx.textAlign = 'center';
-          ctx.fillText('[SPACE] BITE PLANT', plant.x, plant.y - plant.radius - 10);
-          break;
-        }
-      }
-    }
-
-    ctx.restore();
   }
 
   /**
@@ -1066,12 +1048,22 @@ export class Renderer {
   /**
    * 12. World solid border (dark navy, 20 units thick)
    */
-  private drawWorldBorder(ctx: CanvasRenderingContext2D): void {
+  private drawWorldBorder(ctx: CanvasRenderingContext2D, lod: LOD): void {
     const w = CONFIG.world.width;
     const h = CONFIG.world.height;
     const t = CONFIG.world.wallThickness;
 
     ctx.save();
+
+    if (lod === 'low') {
+      // Thin 1px outline instead of the thick filled wall bars.
+      ctx.strokeStyle = CONFIG.colors.wall;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0, 0, w, h);
+      ctx.restore();
+      return;
+    }
+
     ctx.fillStyle = CONFIG.colors.wall;
 
     ctx.fillRect(0, 0, w, t);

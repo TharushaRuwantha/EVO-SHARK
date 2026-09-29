@@ -71,6 +71,11 @@ export function createPlantInstance(
 /**
  * Checks if a candidate plant position (x, y) is valid:
  * Not inside walls and not within obstacleMargin of any obstacle.
+ *
+ * Note: this is also reused by World.findSafeSpawnPosition for creature
+ * spawn placement, so it deliberately does NOT check plant-to-plant
+ * spacing — see isFarEnoughFromPlants for that, applied only by the plant
+ * spawning functions below.
  */
 export function isValidPlantLocation(x: number, y: number, obstacles: Obstacle[]): boolean {
   const wallPad = CONFIG.plants.wallMargin + CONFIG.world.wallThickness;
@@ -94,6 +99,15 @@ export function isValidPlantLocation(x: number, y: number, obstacles: Obstacle[]
   return true;
 }
 
+/** Whether (x, y) is at least CONFIG.plants.minSpacing away from every existing plant. */
+function isFarEnoughFromPlants(x: number, y: number, plants: Plant[]): boolean {
+  const minSpacing = CONFIG.plants.minSpacing;
+  for (const p of plants) {
+    if (Math.hypot(x - p.x, y - p.y) < minSpacing) return false;
+  }
+  return true;
+}
+
 /**
  * Initialize or regenerate starting plants deterministically or randomly.
  */
@@ -112,7 +126,7 @@ export function generateInitialPlants(
     const x = rng.range(pad, CONFIG.world.width - pad);
     const y = rng.range(pad, CONFIG.world.height - pad);
 
-    if (isValidPlantLocation(x, y, obstacles)) {
+    if (isValidPlantLocation(x, y, obstacles) && isFarEnoughFromPlants(x, y, plants)) {
       plants.push(createPlantInstance(x, y, rng));
     }
   }
@@ -153,7 +167,7 @@ export function spawnPlantBurst(
         const dist = rng.range(20, 80);
         const nx = parent.x + Math.cos(angle) * dist;
         const ny = parent.y + Math.sin(angle) * dist;
-        if (isValidPlantLocation(nx, ny, obstacles)) {
+        if (isValidPlantLocation(nx, ny, obstacles) && isFarEnoughFromPlants(nx, ny, plants)) {
           plants.push(createPlantInstance(nx, ny, rng));
           spawned++;
           placed = true;
@@ -167,7 +181,7 @@ export function spawnPlantBurst(
       for (let attempt = 0; attempt < 15; attempt++) {
         const rx = rng.range(pad, CONFIG.world.width - pad);
         const ry = rng.range(pad, CONFIG.world.height - pad);
-        if (isValidPlantLocation(rx, ry, obstacles)) {
+        if (isValidPlantLocation(rx, ry, obstacles) && isFarEnoughFromPlants(rx, ry, plants)) {
           plants.push(createPlantInstance(rx, ry, rng));
           spawned++;
           break;
@@ -180,70 +194,64 @@ export function spawnPlantBurst(
 }
 
 /**
- * Spawns new plants based on the vegetative reproduction rule:
- * Every spawnIntervalSec, if below cap, existing plants sprout offspring nearby (or random if empty).
+ * Attempts to place one new plant: near a random existing parent first (like
+ * natural vegetative spread), falling back to open water. Respects the same
+ * spacing rules as every other plant-placement path.
+ */
+function spawnOnePlant(plants: Plant[], obstacles: Obstacle[], rng: PRNG): boolean {
+  if (plants.length > 0) {
+    const parent = plants[Math.floor(rng.range(0, plants.length))];
+    for (let attempt = 0; attempt < 15; attempt++) {
+      const angle = rng.range(0, Math.PI * 2);
+      const dist = rng.range(25, 75);
+      const nx = parent.x + Math.cos(angle) * dist;
+      const ny = parent.y + Math.sin(angle) * dist;
+      if (isValidPlantLocation(nx, ny, obstacles) && isFarEnoughFromPlants(nx, ny, plants)) {
+        plants.push(createPlantInstance(nx, ny, rng));
+        return true;
+      }
+    }
+  }
+
+  const pad = CONFIG.plants.wallMargin + CONFIG.world.wallThickness;
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const rx = rng.range(pad, CONFIG.world.width - pad);
+    const ry = rng.range(pad, CONFIG.world.height - pad);
+    if (isValidPlantLocation(rx, ry, obstacles) && isFarEnoughFromPlants(rx, ry, plants)) {
+      plants.push(createPlantInstance(rx, ry, rng));
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Logistic-growth plant regrowth: growthPerSecond = r * P * (1 - P / K),
+ * plus a small constant seeding term while below K so the population can
+ * always recover from near-zero, not just decelerate as it approaches
+ * capacity. Fractional growth accumulates in `state.spawnAccumulator`
+ * until it reaches a whole plant. Growth is zero at or above K.
  */
 export function updatePlantReproduction(
   plants: Plant[],
   obstacles: Obstacle[],
   rng: PRNG,
   dt: number,
-  accumulator: { timer: number },
+  state: { spawnAccumulator: number },
 ): void {
-  accumulator.timer += dt;
-  if (accumulator.timer >= CONFIG.plants.spawnIntervalSec) {
-    accumulator.timer -= CONFIG.plants.spawnIntervalSec;
+  const { K, r, seedRatePerSec } = CONFIG.plants.growth;
+  const currentCount = plants.length;
 
-    if (plants.length >= CONFIG.plants.cap) {
-      return;
-    }
+  if (currentCount >= K) return;
 
-    if (plants.length === 0) {
-      // Spawn at least one if all were eaten
-      const pad = CONFIG.plants.wallMargin + CONFIG.world.wallThickness;
-      for (let attempt = 0; attempt < 20; attempt++) {
-        const rx = rng.range(pad, CONFIG.world.width - pad);
-        const ry = rng.range(pad, CONFIG.world.height - pad);
-        if (isValidPlantLocation(rx, ry, obstacles)) {
-          plants.push(createPlantInstance(rx, ry, rng));
-          break;
-        }
-      }
-      return;
-    }
+  const logisticGrowth = r * currentCount * (1 - currentCount / K);
+  const growthPerSecond = Math.max(0, logisticGrowth) + seedRatePerSec;
+  state.spawnAccumulator += growthPerSecond * dt;
 
-    // Vegetative reproduction: each current plant attempts to reproduce one child nearby
-    const currentCount = plants.length;
-    const spotsAvailable = CONFIG.plants.cap - currentCount;
-    const spawnAttempts = Math.min(currentCount, spotsAvailable);
-
-    for (let i = 0; i < spawnAttempts; i++) {
-      const parent = plants[i];
-      let spawned = false;
-
-      for (let attempt = 0; attempt < 15; attempt++) {
-        const angle = rng.range(0, Math.PI * 2);
-        const dist = rng.range(25, 75);
-        const nx = parent.x + Math.cos(angle) * dist;
-        const ny = parent.y + Math.sin(angle) * dist;
-
-        if (isValidPlantLocation(nx, ny, obstacles)) {
-          plants.push(createPlantInstance(nx, ny, rng));
-          spawned = true;
-          break;
-        }
-      }
-
-      if (!spawned && plants.length < CONFIG.plants.cap) {
-        // Fallback: try open water
-        const pad = CONFIG.plants.wallMargin + CONFIG.world.wallThickness;
-        const rx = rng.range(pad, CONFIG.world.width - pad);
-        const ry = rng.range(pad, CONFIG.world.height - pad);
-        if (isValidPlantLocation(rx, ry, obstacles)) {
-          plants.push(createPlantInstance(rx, ry, rng));
-        }
-      }
-    }
+  while (state.spawnAccumulator >= 1 && plants.length < K) {
+    state.spawnAccumulator -= 1;
+    spawnOnePlant(plants, obstacles, rng);
   }
 }
 

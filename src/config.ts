@@ -15,14 +15,30 @@ export const CONFIG = {
     minSpacing: 80,
     wallMargin: 60,
   },
+  spawn: {
+    wallMargin: 60, // min distance from any wall at spawn
+    obstacleMargin: 40, // min distance from any obstacle at spawn
+    sameSpeciesMinDist: 40, // min distance between two creatures of the same species
+    preySharkMinDist: 200, // min distance between any fish and any shark
+    sharkSharkMinDist: 300, // min distance between two sharks
+  },
   plants: {
-    cap: 4000,
+    cap: 4000, // hard safety ceiling for manual regen/burst actions only
     initial: 400,
-    spawnIntervalSec: 4,
+    spawnIntervalSec: 4, // used by manual regen/burst actions only
     radius: 7,
     obstacleMargin: 40,
     wallMargin: 80,
+    minSpacing: 30, // min distance from any other plant when placing a new one
     coverRadius: 24, // Radius within which plants provide visual camouflage cover
+    // Automatic per-tick population growth (see plant.ts updatePlantReproduction):
+    // logistic growth growthPerSecond = r * P * (1 - P / K), plus a small
+    // constant seeding term below K so the world always has some recovery.
+    growth: {
+      K: 50, // carrying capacity for automatic regrowth
+      r: 0.04, // intrinsic growth rate per second
+      seedRatePerSec: 0.02, // minimum growth/sec while below K, even at P=0
+    },
   },
   species: {
     shark: {
@@ -35,7 +51,7 @@ export const CONFIG = {
       drag: 0.90,
       biteRange: 55, // proximity used for meat-scavenging and the AI targeting cue
       biteCooldownTicks: 18, // ticks between bite attempts (60Hz tick)
-      initialCount: 5,
+      initialCount: 2,
       foodToClone: 2, // Eating 2 small fish (or equivalent meat) triggers cloning
       // Energy
       energyMax: 100,
@@ -43,10 +59,12 @@ export const CONFIG = {
       thrustDrain: 0.15, // extra energy/tick at full thrust
       energyGainPerFood: 45, // scavenging floating meat remains
       preyEnergyGain: 80, // killing prey outright with a bite
-      // Health
+      // Health regeneration: costs energy, scales with how fed the
+      // creature is, and stops entirely below minEnergyToHeal.
       maxHealth: 100,
-      regenRate: 0.01, // health/tick, only while well-fed
-      regenEnergyThreshold: 0.5,
+      maxRegenRate: 0.03, // HP/tick at full energy
+      minEnergyToHeal: 0.3, // energy fraction below which no healing happens
+      costPerHP: 0.5, // energy spent per HP restored
       // Bite attack
       biteDamage: 12,
       biteEnergyCost: 2, // spent per bite attempt, hit or miss
@@ -64,7 +82,7 @@ export const CONFIG = {
       drag: 0.92,
       biteRange: 38, // proximity used for meat-scavenging and the AI targeting cue
       biteCooldownTicks: 15, // ticks between eat attempts (60Hz tick)
-      initialCount: 25, // 25 small fish at startup!
+      initialCount: 20,
       foodToClone: 3,  // Eating 3 plants or meat remains triggers cloning
       // Energy
       energyMax: 100,
@@ -73,10 +91,12 @@ export const CONFIG = {
       energyGainPerFood: 30, // scavenging floating meat remains
       plantEnergyGain: 25, // eating a plant
       preyEnergyGain: 0, // fish don't kill prey
-      // Health
+      // Health regeneration: costs energy, scales with how fed the
+      // creature is, and stops entirely below minEnergyToHeal.
       maxHealth: 30,
-      regenRate: 0.02, // health/tick, only while well-fed
-      regenEnergyThreshold: 0.4,
+      maxRegenRate: 0.05, // HP/tick at full energy
+      minEnergyToHeal: 0.3, // energy fraction below which no healing happens
+      costPerHP: 0.5, // energy spent per HP restored
       // Bite attack (fish have no attack damage, but share the shape so
       // SpeciesStats stays a single uniform type across both species)
       biteDamage: 0,
@@ -129,7 +149,9 @@ export const CONFIG = {
     },
   },
   camera: {
-    minZoom: 0.3,
+    // No static minZoom: Camera computes it dynamically as the
+    // fit-entire-world-with-padding zoom level (see Camera.fitToScreen),
+    // since that depends on the current viewport size, not a constant.
     maxZoom: 3.0,
     initialZoom: 'fit' as const,
   },

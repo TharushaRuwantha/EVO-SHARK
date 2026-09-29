@@ -41,7 +41,7 @@ export class World {
   public controlledCreature: Creature;
 
   public ticks: number = 0;
-  private plantTimer = { timer: 0 };
+  private plantGrowthState = { spawnAccumulator: 0 };
 
   // Shared per-tick sensor infrastructure: rebuilt/updated once per tick in
   // tickAI() and read by every creature's buildObservation() call next tick
@@ -83,15 +83,64 @@ export class World {
     this.smellField.update(this.aliveFish, this.aliveSharks, this.meatRemains);
   }
 
+  /** Every point in `points` must be at least `minDist` away from (x, y). */
+  private isFarFromAll(x: number, y: number, points: { x: number; y: number }[], minDist: number): boolean {
+    if (minDist <= 0) return true;
+    for (const p of points) {
+      if (Math.hypot(x - p.x, y - p.y) < minDist) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Finds a spawn position respecting: wall/obstacle margins, a minimum
+   * distance from other already-placed creatures of the same species, and
+   * a minimum distance from already-placed creatures of the other species
+   * (0 to skip that check). Falls back to any wall/obstacle-safe spot if
+   * the spacing constraints can't be satisfied within the attempt budget,
+   * so spawning never hangs or crashes.
+   */
+  private findCreatureSpawnPosition(
+    sameSpecies: { x: number; y: number }[],
+    otherSpecies: { x: number; y: number }[],
+    sameSpeciesMinDist: number,
+    otherSpeciesMinDist: number
+  ): { x: number; y: number } {
+    const { wallMargin, obstacleMargin } = CONFIG.spawn;
+    const pad = CONFIG.world.wallThickness + wallMargin;
+
+    for (let attempt = 0; attempt < 400; attempt++) {
+      const x = this.rng.range(pad, CONFIG.world.width - pad);
+      const y = this.rng.range(pad, CONFIG.world.height - pad);
+
+      let obstacleOk = true;
+      for (const obs of this.obstacles) {
+        if (Math.hypot(x - obs.x, y - obs.y) < obs.boundingRadius + obstacleMargin) {
+          obstacleOk = false;
+          break;
+        }
+      }
+      if (!obstacleOk) continue;
+
+      if (!this.isFarFromAll(x, y, sameSpecies, sameSpeciesMinDist)) continue;
+      if (!this.isFarFromAll(x, y, otherSpecies, otherSpeciesMinDist)) continue;
+
+      return { x, y };
+    }
+
+    // Fallback: relax spacing constraints rather than hang/crash.
+    return this.findSafeSpawnPosition(CONFIG.world.width / 2, CONFIG.world.height / 2, 0);
+  }
+
   private spawnInitialSharks(): Creature[] {
     const sharks: Creature[] = [];
     const count = CONFIG.species.shark.initialCount;
+    const placed: { x: number; y: number }[] = [];
     for (let i = 0; i < count; i++) {
-      const clusterCenterX = 500 + (i % 3) * 220 + this.rng.range(-60, 60);
-      const clusterCenterY = 500 + Math.floor(i / 3) * 220 + this.rng.range(-60, 60);
-      const sharkPos = this.findSafeSpawnPosition(clusterCenterX, clusterCenterY, CONFIG.species.shark.radius);
+      const pos = this.findCreatureSpawnPosition(placed, [], CONFIG.spawn.sharkSharkMinDist, 0);
+      placed.push(pos);
       const heading = this.rng.range(-Math.PI, Math.PI);
-      sharks.push(new Creature('shark', sharkPos.x, sharkPos.y, heading));
+      sharks.push(new Creature('shark', pos.x, pos.y, heading));
     }
     return sharks;
   }
@@ -99,12 +148,18 @@ export class World {
   private spawnInitialFish(): Creature[] {
     const fishList: Creature[] = [];
     const count = CONFIG.species.fish.initialCount;
+    const placed: { x: number; y: number }[] = [];
+    const sharkPositions = this.sharks.map((s) => ({ x: s.x, y: s.y }));
     for (let i = 0; i < count; i++) {
-      const clusterCenterX = 1100 + (i % 4) * 180 + this.rng.range(-60, 60);
-      const clusterCenterY = 400 + Math.floor(i / 4) * 140 + this.rng.range(-50, 50);
-      const fishPos = this.findSafeSpawnPosition(clusterCenterX, clusterCenterY, CONFIG.species.fish.radius);
+      const pos = this.findCreatureSpawnPosition(
+        placed,
+        sharkPositions,
+        CONFIG.spawn.sameSpeciesMinDist,
+        CONFIG.spawn.preySharkMinDist
+      );
+      placed.push(pos);
       const heading = this.rng.range(-Math.PI, Math.PI);
-      fishList.push(new Creature('fish', fishPos.x, fishPos.y, heading));
+      fishList.push(new Creature('fish', pos.x, pos.y, heading));
     }
     return fishList;
   }
@@ -440,35 +495,17 @@ export class World {
         this.sharks.push(child);
         this.particles.emitReproductionSparks(safePos.x, safePos.y, true);
         sound.playClone();
-        createFloatingText(
-          this.floatingTexts,
-          safePos.x,
-          safePos.y - 20,
-          '🦈 BABY SHARK BORN! (+1 CLONE)',
-          '#38bdf8',
-          2.0,
-          1.2
-        );
       } else {
         this.fishList.push(child);
         this.particles.emitReproductionSparks(safePos.x, safePos.y, false);
         sound.playClone();
-        createFloatingText(
-          this.floatingTexts,
-          safePos.x,
-          safePos.y - 15,
-          '✨ SISTER FISH BORN! (+1 CLONE)',
-          '#facc15',
-          2.0,
-          1.2
-        );
       }
     }
   }
 
   public triggerRegeneratePlants(count: number = CONFIG.plants.initial): void {
     this.plants = regeneratePlants(this.rng, this.obstacles, count);
-    this.plantTimer.timer = 0;
+    this.plantGrowthState.spawnAccumulator = 0;
     sound.playRegenerate();
 
     const center = this.controlledCreature;
@@ -524,7 +561,7 @@ export class World {
     this.seed = s;
     this.rng.reseed(s);
     this.ticks = 0;
-    this.plantTimer.timer = 0;
+    this.plantGrowthState.spawnAccumulator = 0;
     this.floatingTexts = [];
     this.meatRemains = [];
     this.particles = new ParticleSystem();
@@ -600,14 +637,29 @@ export class World {
   }
 
   /**
-   * A well-fed creature (energy fraction above its species' threshold) slowly
-   * regenerates health each tick. A starving creature never heals.
+   * Healing costs fuel: regen rate scales linearly with how far above
+   * minEnergyToHeal the creature's energy fraction is (0 at or below that
+   * threshold, full maxRegenRate at 100% energy), and every HP restored
+   * consumes costPerHP energy. A creature that can't afford the energy for
+   * its full regen tick heals only as much as it can pay for.
    */
   private applyRegeneration(creature: Creature): void {
     if (creature.isDead) return;
-    if (creature.energyFraction > creature.stats.regenEnergyThreshold) {
-      creature.health = Math.min(creature.stats.maxHealth, creature.health + creature.stats.regenRate);
+    const { maxRegenRate, minEnergyToHeal, costPerHP, maxHealth } = creature.stats;
+    if (creature.health >= maxHealth) return;
+
+    const healFraction = Math.max(0, Math.min(1, (creature.energyFraction - minEnergyToHeal) / (1 - minEnergyToHeal)));
+    let healthHealed = Math.min(maxRegenRate * healFraction, maxHealth - creature.health);
+    if (healthHealed <= 0) return;
+
+    let energySpent = healthHealed * costPerHP;
+    if (creature.energy < energySpent) {
+      healthHealed = creature.energy / costPerHP;
+      energySpent = creature.energy;
     }
+
+    creature.health += healthHealed;
+    creature.energy -= energySpent;
   }
 
   /**
@@ -658,7 +710,7 @@ export class World {
     updateMeatRemains(this.meatRemains, dt);
     updateFloatingTexts(this.floatingTexts, dt);
     this.particles.update(dt);
-    updatePlantReproduction(this.plants, this.obstacles, this.rng, dt, this.plantTimer);
+    updatePlantReproduction(this.plants, this.obstacles, this.rng, dt, this.plantGrowthState);
 
     this.rebuildSensorGrids();
   }
