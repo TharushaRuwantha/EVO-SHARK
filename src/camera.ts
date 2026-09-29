@@ -4,9 +4,16 @@ import { InputManager } from './input';
 export class Camera {
   public x: number = 0;       // Pan offset in screen pixels
   public y: number = 0;       // Pan offset in screen pixels
-  public zoom: number = 1.0;  // Scale factor (clamped 0.3 to 3.0)
+  public zoom: number = 1.0;  // Scale factor, clamped to [minZoom, CONFIG.camera.maxZoom]
   public followTarget: { x: number; y: number } | null = null;
   public isFollowing: boolean = false;
+
+  // The zoom level at which the whole world fits inside the viewport with
+  // a small padding margin — recomputed on every fitToScreen() (i.e. on
+  // init and on window resize) since it depends on the current viewport
+  // size, not a fixed constant. This IS the minimum zoom: you can never
+  // zoom out past seeing the entire world.
+  public minZoom: number = 0.1;
 
   private isDragging: boolean = false;
   private lastMouseX: number = 0;
@@ -50,12 +57,10 @@ export class Camera {
   }
 
   /**
-   * Fill the whole viewport with the ocean, edge-to-edge (a "cover" fit,
-   * not "contain"): the world is scaled up just enough that it always
-   * spans the full screen with no letterboxed border, at the cost of
-   * cropping some of the world off-screen when its aspect ratio doesn't
-   * match the window's. That's fine here since panning is always available
-   * to explore the cropped areas.
+   * Fit the whole world inside the viewport with a small padding margin (a
+   * "contain" fit, not "cover"): the entire 2000x1200 world is always
+   * visible, centered, with no cropping. This is also the new zoom floor —
+   * see minZoom — so the world can never be zoomed out past this view.
    */
   public fitToScreen(): void {
     const cw = this.canvas.clientWidth || window.innerWidth;
@@ -64,11 +69,38 @@ export class Camera {
 
     const scaleX = cw / CONFIG.world.width;
     const scaleY = ch / CONFIG.world.height;
-    const fitScale = Math.max(scaleX, scaleY);
+    const fitScale = Math.min(scaleX, scaleY) * 0.95; // 5% padding
 
-    this.zoom = Math.max(CONFIG.camera.minZoom, Math.min(CONFIG.camera.maxZoom, fitScale));
+    this.minZoom = fitScale;
+    this.zoom = Math.max(this.minZoom, Math.min(CONFIG.camera.maxZoom, fitScale));
     this.x = (cw - CONFIG.world.width * this.zoom) / 2;
     this.y = (ch - CONFIG.world.height * this.zoom) / 2;
+    this.clampPan();
+  }
+
+  /**
+   * Keeps the world's edges from ever leaving the viewport interior: when
+   * the (zoomed) world is smaller than the viewport on an axis, that axis
+   * is centered and locked; when it's larger, panning is clamped so you
+   * can't scroll past either world edge.
+   */
+  private clampPan(): void {
+    const cw = this.canvas.clientWidth || window.innerWidth;
+    const ch = this.canvas.clientHeight || window.innerHeight;
+    const worldW = CONFIG.world.width * this.zoom;
+    const worldH = CONFIG.world.height * this.zoom;
+
+    if (worldW <= cw) {
+      this.x = (cw - worldW) / 2;
+    } else {
+      this.x = Math.max(cw - worldW, Math.min(0, this.x));
+    }
+
+    if (worldH <= ch) {
+      this.y = (ch - worldH) / 2;
+    } else {
+      this.y = Math.max(ch - worldH, Math.min(0, this.y));
+    }
   }
 
   public applyTransform(ctx: CanvasRenderingContext2D): void {
@@ -91,6 +123,7 @@ export class Camera {
       // Soft lerp for silky smooth camera tracking
       this.x += (targetX - this.x) * 0.15;
       this.y += (targetY - this.y) * 0.15;
+      this.clampPan();
     }
   }
 
@@ -126,7 +159,7 @@ export class Camera {
 
     const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
     const newZoom = Math.max(
-      CONFIG.camera.minZoom,
+      this.minZoom,
       Math.min(CONFIG.camera.maxZoom, this.zoom * zoomFactor)
     );
 
@@ -135,6 +168,7 @@ export class Camera {
       // Adjust camera x/y so cursor remains at same world point
       this.x = mouseX - worldBefore.x * this.zoom;
       this.y = mouseY - worldBefore.y * this.zoom;
+      this.clampPan();
     }
   }
 
@@ -164,6 +198,7 @@ export class Camera {
 
     this.x += dx;
     this.y += dy;
+    this.clampPan();
 
     // Dragging manually breaks hard follow so user has full control
     if (this.isFollowing) {
