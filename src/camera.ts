@@ -8,11 +8,11 @@ export class Camera {
   public followTarget: { x: number; y: number } | null = null;
   public isFollowing: boolean = false;
 
-  // The zoom level at which the whole world fits inside the viewport with
-  // a small padding margin — recomputed on every fitToScreen() (i.e. on
-  // init and on window resize) since it depends on the current viewport
-  // size, not a fixed constant. This IS the minimum zoom: you can never
-  // zoom out past seeing the entire world.
+  // The zoom level at which the world fills the entire viewport edge-to-
+  // edge — recomputed on every fitToScreen() (i.e. on init and on window
+  // resize) since it depends on the current viewport size, not a fixed
+  // constant. This IS the minimum zoom: you can never zoom out past this,
+  // so the canvas is never left showing empty space beyond the world.
   public minZoom: number = 0.1;
 
   private isDragging: boolean = false;
@@ -57,10 +57,12 @@ export class Camera {
   }
 
   /**
-   * Fit the whole world inside the viewport with a small padding margin (a
-   * "contain" fit, not "cover"): the entire 2000x1200 world is always
-   * visible, centered, with no cropping. This is also the new zoom floor —
-   * see minZoom — so the world can never be zoomed out past this view.
+   * Fill the entire viewport with the world, edge-to-edge (a "cover" fit):
+   * the canvas is always fully covered by the map, with no letterboxing or
+   * dead space on either axis. When the viewport's aspect ratio doesn't
+   * match the world's 2000x1200, a small strip of the world's shorter axis
+   * is cropped off-screen rather than leaving a border — this is also the
+   * new zoom floor (minZoom), so you can never zoom out past this view.
    */
   public fitToScreen(): void {
     const cw = this.canvas.clientWidth || window.innerWidth;
@@ -69,7 +71,7 @@ export class Camera {
 
     const scaleX = cw / CONFIG.world.width;
     const scaleY = ch / CONFIG.world.height;
-    const fitScale = Math.min(scaleX, scaleY) * 0.95; // 5% padding
+    const fitScale = Math.max(scaleX, scaleY);
 
     this.minZoom = fitScale;
     this.zoom = Math.max(this.minZoom, Math.min(CONFIG.camera.maxZoom, fitScale));
