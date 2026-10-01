@@ -196,34 +196,48 @@ export class ProgressPanel {
     h: number
   ): void {
     const ctx = this.ctx;
-    this.drawAxes(x, y, w, h, 'avg reward');
+    this.drawAxes(x, y, w, h, 'avg reward (5th-95th pct; smoothed line = trend)');
 
-    let allMin = 0;
-    let allMax = 0.001;
     const seriesPerSession: { session: SessionRecord; points: GenerationRecord[] }[] = [];
+    const allValues: number[] = [];
     for (const session of sessions) {
       const points = this.downsample(session.history, 300);
       seriesPerSession.push({ session, points });
       for (const p of points) {
-        allMin = Math.min(allMin, p.sharkAvgReward, p.fishAvgReward);
-        allMax = Math.max(allMax, p.sharkAvgReward, p.fishAvgReward);
+        allValues.push(p.sharkAvgReward, p.fishAvgReward);
       }
     }
+    const [rangeMin, rangeMax] = this.percentileRange(allValues, 0.05, 0.95);
 
     for (const { session, points } of seriesPerSession) {
       if (points.length < 2) continue;
       const isLive = session === sessions[sessions.length - 1] && sessions.length - 1 === liveIndex;
       const maxGen = points[points.length - 1].generation || 1;
-      const dim = !isLive;
-      this.plotLine(points, (p) => p.sharkAvgReward, x, y, w, h, maxGen, allMin, allMax, SHARK_COLOR, dim);
-      this.plotLine(points, (p) => p.fishAvgReward, x, y, w, h, maxGen, allMin, allMax, FISH_COLOR, dim);
+      const window = this.smoothingWindow(points.length);
+
+      // Raw per-generation values are a single-episode Monte Carlo return,
+      // so they're inherently spiky -- draw them faint, then the smoothed
+      // trailing-average on top solid, since that's what actually answers
+      // "is this improving" instead of just "is this noisy".
+      this.plotLine(points, (p) => p.sharkAvgReward, x, y, w, h, maxGen, rangeMin, rangeMax, SHARK_COLOR, true, 0.2);
+      this.plotLine(points, (p) => p.fishAvgReward, x, y, w, h, maxGen, rangeMin, rangeMax, FISH_COLOR, true, 0.2);
+      this.plotLine(
+        this.movingAverage(points, (p) => p.sharkAvgReward, window),
+        (p) => p.value,
+        x, y, w, h, maxGen, rangeMin, rangeMax, SHARK_COLOR, !isLive
+      );
+      this.plotLine(
+        this.movingAverage(points, (p) => p.fishAvgReward, window),
+        (p) => p.value,
+        x, y, w, h, maxGen, rangeMin, rangeMax, FISH_COLOR, !isLive
+      );
     }
 
     ctx.font = '9px monospace';
     ctx.fillStyle = '#64748b';
     ctx.textAlign = 'right';
-    ctx.fillText(allMax.toFixed(2), x - 4, y + 8);
-    ctx.fillText(allMin.toFixed(2), x - 4, y + h);
+    ctx.fillText(rangeMax.toFixed(2), x - 4, y + 8);
+    ctx.fillText(rangeMin.toFixed(2), x - 4, y + h);
     ctx.textAlign = 'left';
   }
 
@@ -236,29 +250,84 @@ export class ProgressPanel {
     h: number
   ): void {
     const ctx = this.ctx;
-    this.drawAxes(x, y, w, h, 'generation length (ticks)');
+    this.drawAxes(x, y, w, h, 'generation length, ticks (5th-95th pct)');
 
-    let maxDuration = 1;
     const seriesPerSession: { session: SessionRecord; points: GenerationRecord[] }[] = [];
+    const allValues: number[] = [];
     for (const session of sessions) {
       const points = this.downsample(session.history, 300);
       seriesPerSession.push({ session, points });
-      for (const p of points) maxDuration = Math.max(maxDuration, p.durationTicks);
+      for (const p of points) allValues.push(p.durationTicks);
     }
+    const [, rangeMax] = this.percentileRange(allValues, 0.05, 0.95);
+    const rangeMin = 0; // ticks can't go negative; always anchor the floor at 0
 
     for (const { session, points } of seriesPerSession) {
       if (points.length < 2) continue;
       const isLive = session === sessions[sessions.length - 1] && sessions.length - 1 === liveIndex;
       const maxGen = points[points.length - 1].generation || 1;
-      this.plotLine(points, (p) => p.durationTicks, x, y, w, h, maxGen, 0, maxDuration, '#94a3b8', !isLive);
+      const window = this.smoothingWindow(points.length);
+
+      this.plotLine(points, (p) => p.durationTicks, x, y, w, h, maxGen, rangeMin, rangeMax, '#94a3b8', true, 0.2);
+      this.plotLine(
+        this.movingAverage(points, (p) => p.durationTicks, window),
+        (p) => p.value,
+        x, y, w, h, maxGen, rangeMin, rangeMax, '#94a3b8', !isLive
+      );
     }
 
     ctx.font = '9px monospace';
     ctx.fillStyle = '#64748b';
     ctx.textAlign = 'right';
-    ctx.fillText(maxDuration.toLocaleString(), x - 4, y + 8);
+    ctx.fillText(rangeMax.toLocaleString(), x - 4, y + 8);
     ctx.fillText('0', x - 4, y + h);
     ctx.textAlign = 'left';
+  }
+
+  /** Linear-interpolated percentile of an unsorted array (sorts a copy). */
+  private percentileRange(values: number[], loPct: number, hiPct: number): [number, number] {
+    if (values.length === 0) return [0, 1];
+    const sorted = [...values].sort((a, b) => a - b);
+    const at = (p: number): number => {
+      const idx = (sorted.length - 1) * p;
+      const lo = Math.floor(idx);
+      const hi = Math.ceil(idx);
+      if (lo === hi) return sorted[lo];
+      return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+    };
+    let lo = at(loPct);
+    let hi = at(hiPct);
+    if (hi - lo < 1e-6) {
+      // Degenerate (near-constant data): pad so the line isn't drawn on a
+      // zero-height range, which would divide by ~0 in plotLine.
+      lo -= 0.5;
+      hi += 0.5;
+    }
+    return [lo, hi];
+  }
+
+  /** Trailing moving average over the (already generation-ordered) points. */
+  private movingAverage<T extends { generation: number }>(
+    points: T[],
+    valueOf: (p: T) => number,
+    window: number
+  ): { generation: number; value: number }[] {
+    const out: { generation: number; value: number }[] = [];
+    const buffer: number[] = [];
+    let sum = 0;
+    for (const p of points) {
+      const v = valueOf(p);
+      buffer.push(v);
+      sum += v;
+      if (buffer.length > window) sum -= buffer.shift()!;
+      out.push({ generation: p.generation, value: sum / buffer.length });
+    }
+    return out;
+  }
+
+  /** Wider smoothing window for longer series, so the trend line stays readable either way. */
+  private smoothingWindow(pointCount: number): number {
+    return Math.max(3, Math.round(pointCount * 0.08));
   }
 
   private drawAxes(x: number, y: number, w: number, h: number, label: string): void {
@@ -285,9 +354,9 @@ export class ProgressPanel {
     ctx.fillText(label, x, y - 2);
   }
 
-  private plotLine(
-    points: GenerationRecord[],
-    valueOf: (p: GenerationRecord) => number,
+  private plotLine<T extends { generation: number }>(
+    points: T[],
+    valueOf: (p: T) => number,
     x: number,
     y: number,
     w: number,
@@ -296,17 +365,22 @@ export class ProgressPanel {
     minVal: number,
     maxVal: number,
     color: string,
-    dim: boolean
+    dim: boolean,
+    alphaOverride?: number
   ): void {
     const ctx = this.ctx;
     const range = maxVal - minVal || 1;
     ctx.beginPath();
     ctx.strokeStyle = color;
-    ctx.globalAlpha = dim ? 0.35 : 0.95;
+    ctx.globalAlpha = alphaOverride ?? (dim ? 0.35 : 0.95);
     ctx.lineWidth = dim ? 1 : 1.5;
     points.forEach((p, i) => {
       const px = x + (p.generation / maxGen) * w;
-      const py = y + h - ((valueOf(p) - minVal) / range) * h;
+      // Clamp to the chart box: with a percentile-clipped range, a spike
+      // outside [minVal, maxVal] should flatten at the edge, not escape
+      // into the chart above/below (there's no canvas clip region here).
+      const rawPy = y + h - ((valueOf(p) - minVal) / range) * h;
+      const py = Math.max(y, Math.min(y + h, rawPy));
       if (i === 0) ctx.moveTo(px, py);
       else ctx.lineTo(px, py);
     });
@@ -330,10 +404,13 @@ export class ProgressPanel {
     ctx.fillText('— fish reward', x, y + 30);
     ctx.fillStyle = '#94a3b8';
     ctx.fillText('— gen length', x, y + 44);
+    ctx.fillStyle = '#475569';
+    ctx.font = '9px monospace';
+    ctx.fillText('(faint = raw, solid = trend)', x, y + 57);
 
-    let rowY = y + 62;
+    let rowY = y + 73;
     const rowH = 16;
-    const maxRows = Math.max(1, Math.floor((h - 62) / rowH));
+    const maxRows = Math.max(1, Math.floor((h - 73) / rowH));
     const startIdx = Math.max(0, sessions.length - maxRows);
 
     for (let i = sessions.length - 1; i >= startIdx; i--) {
