@@ -225,9 +225,17 @@ export class World {
    */
   public updatePlantCover(): void {
     const coverR = CONFIG.plants.coverRadius;
+    // Rebuilt here (not just relying on rebuildSensorGrids, which runs at a
+    // different point in the tick, or not at all after a manual plant
+    // regen/burst/clear) so this always prunes against the *current*
+    // this.plants, never a stale grid from before a plant-count change.
+    this.plantGrid.build(this.plants);
     for (const fish of this.aliveFish) {
       let covered = false;
-      for (const plant of this.plants) {
+      // Only plants within coverR can possibly cover this fish, so prune
+      // with the spatial grid instead of checking every plant in the world
+      // (up to CONFIG.plants.cap) for every fish, every tick.
+      for (const plant of this.plantGrid.queryRadius(fish.x, fish.y, coverR)) {
         const d = Math.hypot(fish.x - plant.x, fish.y - plant.y);
         if (d <= coverR) {
           covered = true;

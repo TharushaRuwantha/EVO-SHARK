@@ -136,7 +136,21 @@ export class Trainer {
     const inputs = new Map<number, CreatureInput>();
     const actedThisTick = new Map<number, { agent: SpeciesAgent; action: number; forward: ForwardResult }>();
 
+    // Built once per tick so the reward pass below can look a creature up by
+    // id in O(1) instead of re-scanning (and reallocating) the full
+    // sharks+fish array per acted creature. Safe to reuse after tickAI(): a
+    // creature that dies this tick is mutated in place (isDead flips), not
+    // replaced or removed from its array until its fade animation finishes
+    // several ticks later, so these references stay valid.
+    const creatureById = new Map<number, Creature>();
+    const foodEatenBefore = new Map<number, number>();
+    const cloneCountBefore = new Map<number, number>();
+
     for (const creature of world.allAliveCreatures) {
+      creatureById.set(creature.id, creature);
+      foodEatenBefore.set(creature.id, creature.biteScore);
+      cloneCountBefore.set(creature.id, creature.cloneCount);
+
       const obs = buildObservation(creature, world);
       const agent = this.agentFor(creature);
       const { action, forward } = agent.act(obs);
@@ -144,20 +158,14 @@ export class Trainer {
       actedThisTick.set(creature.id, { agent, action, forward });
     }
 
-    const wasAlive = new Set<number>(world.allAliveCreatures.map((c) => c.id));
-    const foodEatenBefore = new Map<number, number>();
-    const cloneCountBefore = new Map<number, number>();
-    for (const c of world.allAliveCreatures) {
-      foodEatenBefore.set(c.id, c.biteScore);
-      cloneCountBefore.set(c.id, c.cloneCount);
-    }
+    const wasAlive = creatureById;
 
     world.tickAI(inputs);
     this.totalSteps++;
 
     // Assign rewards and record this tick's step for every creature that acted.
     for (const [id, acted] of actedThisTick) {
-      const creature = [...world.sharks, ...world.fishList].find((c) => c.id === id);
+      const creature = creatureById.get(id);
       if (!creature) continue;
 
       let reward = 0;
