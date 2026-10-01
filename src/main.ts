@@ -9,6 +9,7 @@ import { sound } from './audio';
 import { Trainer } from './rl/trainer';
 import { BrainVisualizer } from './brainviz';
 import { SensorPanel } from './sensorPanel';
+import { ProgressPanel } from './progressPanel';
 
 type ViewMode = 'simulation' | 'showcase' | 'free';
 
@@ -113,6 +114,10 @@ function bootstrap(): void {
         <span>📡</span> <span class="hidden lg:inline">Sensors</span>
       </button>
 
+      <button id="btn-toggle-progress" title="Show/hide training progress charts (reward & survival vs generation, across sessions)" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
+        <span>📈</span> <span class="hidden lg:inline">Progress</span>
+      </button>
+
       <button id="btn-toggle-help" title="About this training mode" class="p-2 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 text-sm transition-all duration-150 cursor-pointer active:scale-95">
         ❓
       </button>
@@ -186,6 +191,7 @@ function bootstrap(): void {
   const renderer = new Renderer(canvas);
   const brainViz = new BrainVisualizer(simWrapper);
   const sensorPanel = new SensorPanel(simWrapper);
+  const progressPanel = new ProgressPanel(simWrapper);
 
   // Main simulation world (#/sim), persistently trained and checkpointed, and
   // an exact, fully independent copy mounted at (#/free) for separate,
@@ -370,6 +376,7 @@ function bootstrap(): void {
     if (dueForRender && (currentView === 'simulation' || currentView === 'free')) {
       renderer.render(world, camera, input, currentFps, now / 1000);
       maxModeLastRenderAt = now;
+      if (progressPanel.isVisible) progressPanel.render(trainer, now);
     }
     if (dueForRender) {
       updateTrainingStatsUI();
@@ -425,6 +432,7 @@ function bootstrap(): void {
   input.onToggleBrainViz = () => brainViz.toggle();
   input.onToggleSensorPanel = () => sensorPanel.toggle();
   topBar.querySelector('#btn-toggle-sensor-panel')?.addEventListener('click', () => sensorPanel.toggle());
+  topBar.querySelector('#btn-toggle-progress')?.addEventListener('click', () => progressPanel.toggle());
 
   // True browser fullscreen, so the ocean map can fill the entire display
   // (not just the browser viewport) while exploring it.
@@ -590,6 +598,7 @@ function bootstrap(): void {
     if (!maxModeActive && (currentView === 'simulation' || currentView === 'free')) {
       renderer.render(world, camera, input, currentFps, currentTime / 1000);
       updateTrainingStatsUI();
+      if (progressPanel.isVisible) progressPanel.render(trainer, currentTime);
 
       if (brainViz.isVisible || sensorPanel.isVisible) {
         const controlled = world.controlledCreature;

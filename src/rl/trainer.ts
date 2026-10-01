@@ -6,7 +6,14 @@ import { SpeciesAgent } from './agent';
 import { ForwardResult } from './network';
 import { buildObservation, OBS_SIZE } from './perception';
 import { actionToInput } from './actions';
-import { Checkpoint, loadCheckpoint, saveCheckpoint, saveCheckpointBeacon } from './persistence';
+import {
+  Checkpoint,
+  GenerationRecord,
+  SessionRecord,
+  loadCheckpoint,
+  saveCheckpoint,
+  saveCheckpointBeacon,
+} from './persistence';
 
 interface PendingStep {
   forward: ForwardResult;
@@ -44,6 +51,15 @@ export class Trainer {
   public totalSteps: number = 0;
   public resumedFromCheckpoint: boolean = false;
 
+  // One entry per training "session": a continuous lineage that starts when
+  // the network is freshly initialized and keeps accumulating history across
+  // reloads for as long as checkpoints keep resuming into it. A fresh start
+  // (no checkpoint, or an incompatible one -- see init()) begins a new one,
+  // so this is what "compare with a previous session" means: distinct
+  // training runs, not distinct page loads.
+  private sessions: SessionRecord[] = [Trainer.newSession()];
+  private static readonly MAX_HISTORY_PER_SESSION = 4000;
+
   private pending: Map<number, PendingStep[]> = new Map();
   private readonly persist: boolean;
   private lastAutosave = 0;
@@ -59,6 +75,14 @@ export class Trainer {
     this.sharkAgent = new SpeciesAgent();
     this.fishAgent = new SpeciesAgent();
     this.persist = options.persist;
+  }
+
+  private static newSession(): SessionRecord {
+    return {
+      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      startedAt: Date.now(),
+      history: [],
+    };
   }
 
   public async init(): Promise<void> {
@@ -89,6 +113,29 @@ export class Trainer {
     this.fishAgent = SpeciesAgent.fromJSON(checkpoint.fish);
     this.generation = checkpoint.generation;
     this.totalSteps = checkpoint.totalSteps;
+    // Resume the same lineage's history if the checkpoint has one; older
+    // checkpoints saved before this field existed just keep the single
+    // fresh session created in the constructor, so charts start recording
+    // from here on rather than crashing or losing the resumed weights.
+    if (checkpoint.sessions && checkpoint.sessions.length > 0) {
+      this.sessions = checkpoint.sessions;
+    }
+  }
+
+  /** All training sessions (distinct lineages) recorded so far, oldest first. */
+  public getSessions(): readonly SessionRecord[] {
+    return this.sessions;
+  }
+
+  private pushHistoryRecord(record: GenerationRecord): void {
+    const session = this.sessions[this.sessions.length - 1];
+    session.history.push(record);
+    if (session.history.length > Trainer.MAX_HISTORY_PER_SESSION) {
+      // Thin by half rather than drop the oldest half outright, so the
+      // chart still spans the whole session, just at falling resolution the
+      // longer training runs -- bounds memory/storage without a hard cutoff.
+      session.history = session.history.filter((_, i) => i % 2 === 0);
+    }
   }
 
   public buildCheckpoint(): Checkpoint {
@@ -97,6 +144,7 @@ export class Trainer {
       generation: this.generation,
       totalSteps: this.totalSteps,
       savedAt: new Date().toISOString(),
+      sessions: this.sessions,
       shark: this.sharkAgent.toJSON(),
       fish: this.fishAgent.toJSON(),
     };
@@ -210,6 +258,21 @@ export class Trainer {
     }
     this.pending.clear();
     this.lastForward.clear();
+
+    // Snapshot before world.reset() clears ticks/population -- this is the
+    // one row of training history this generation contributes to the chart.
+    this.pushHistoryRecord({
+      generation: this.generation,
+      totalSteps: this.totalSteps,
+      timestamp: Date.now(),
+      durationTicks: this.world.ticks,
+      sharkAvgReward: this.sharkAgent.avgReward,
+      fishAvgReward: this.fishAgent.avgReward,
+      sharkEpisodes: this.sharkAgent.episodesTrained,
+      fishEpisodes: this.fishAgent.episodesTrained,
+      sharkAliveEnd: this.world.aliveSharks.length,
+      fishAliveEnd: this.world.aliveFish.length,
+    });
 
     this.generation++;
     this.world.reset();

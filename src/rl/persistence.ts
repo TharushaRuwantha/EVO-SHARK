@@ -1,5 +1,34 @@
 import { AgentJSON } from './agent';
 
+/** One row of training history, recorded at the end of each generation. */
+export interface GenerationRecord {
+  generation: number;
+  totalSteps: number;
+  timestamp: number; // Date.now() when the generation ended
+  durationTicks: number; // how long this generation lasted (ticks)
+  sharkAvgReward: number;
+  fishAvgReward: number;
+  sharkEpisodes: number;
+  fishEpisodes: number;
+  sharkAliveEnd: number;
+  fishAliveEnd: number;
+}
+
+/**
+ * One continuous training lineage: starts when the network is freshly
+ * initialized (no checkpoint to resume, or an incompatible one) and keeps
+ * accumulating `history` across page reloads/server restarts for as long as
+ * checkpoints keep resuming into it. A new session only starts when training
+ * actually restarts from scratch -- so this is the unit "compare with a
+ * previous session" means: a distinct training run, not a distinct page load.
+ */
+export interface SessionRecord {
+  id: string;
+  startedAt: number; // Date.now() when this session's network was created
+  label?: string;
+  history: GenerationRecord[];
+}
+
 export interface Checkpoint {
   version: 1;
   generation: number;
@@ -7,6 +36,8 @@ export interface Checkpoint {
   savedAt: string;
   shark: AgentJSON;
   fish: AgentJSON;
+  // Optional: absent on checkpoints saved before this field existed.
+  sessions?: SessionRecord[];
 }
 
 const CHECKPOINT_URL = '/api/checkpoint';
