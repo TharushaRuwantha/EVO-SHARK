@@ -127,6 +127,24 @@ export function computeVision(self: Creature, world: World, out: Float32Array, o
       }
     }
 
+    // A living creature is harder to positively identify from a distance
+    // than static terrain/plants: a shape near the edge of vision range
+    // isn't confidently "that's a predator" yet, the way it would be once
+    // it's close. Within an inner confident-ID radius the read is always
+    // reliable; beyond it, identification confidence fades linearly to 0 at
+    // max range, and an unconfident read comes back as 'empty' (something
+    // is sensed -- the distance channel still reports it truthfully -- just
+    // not positively identified) rather than a guaranteed species label.
+    if ((bestType === 'prey' || bestType === 'predator') && bestDist < range) {
+      const confidentRadius = range * CONFIG.sensors.vision.idConfidentRangePct;
+      if (bestDist > confidentRadius) {
+        const uncertainty = (bestDist - confidentRadius) / (range - confidentRadius);
+        if (Math.random() < uncertainty) {
+          bestType = 'empty';
+        }
+      }
+    }
+
     let finalType: HitType = bestType;
     let finalDist = bestDist;
     if (bestDist >= range) {

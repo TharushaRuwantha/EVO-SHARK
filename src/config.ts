@@ -125,6 +125,11 @@ export const CONFIG = {
     vision: {
       shark: { rayCount: 12, fovDeg: 240, range: 400, angularJitterDeg: 5, distanceNoisePct: 10 },
       fish: { rayCount: 12, fovDeg: 280, range: 350, angularJitterDeg: 5, distanceNoisePct: 10 },
+      // Fraction of a ray's range within which a sighted prey/predator is
+      // always positively identified; beyond it, ID confidence fades
+      // linearly to 0 at max range (see vision.ts) -- real eyesight can
+      // tell *something is there* well before it can tell *what* it is.
+      idConfidentRangePct: 0.4,
     },
     smell: {
       gridW: 50,

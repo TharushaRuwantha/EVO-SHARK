@@ -323,18 +323,20 @@ function bootstrap(): void {
 
   // Max mode: decouples training from wall-clock/rAF pacing entirely and
   // steps the trainer in a tight, self-yielding loop bounded only by a CPU
-  // time budget, so a generation that would take 20 wall-clock seconds at
-  // 20x instead finishes as fast as the machine can compute it. Rendering
-  // (and the DOM stat readout) is skipped on most batches — only refreshed
-  // every MAX_MODE_RENDER_EVERY_GENERATIONS generations, or on a time
-  // fallback — since redrawing the canvas every tick would itself become
-  // the bottleneck at this pace.
+  // time budget, so training runs as fast as the machine can compute it
+  // instead of being paced to real time. Rendering is the expensive part
+  // (a full canvas redraw), so it's skipped on most batches and only drawn
+  // on a wall-clock interval -- generation count is *not* used to gate
+  // rendering: a generation can run anywhere from a few hundred ticks to
+  // CONFIG.rl.maxEpisodeTicks, so "render every N generations" can't
+  // reliably predict how much real time (or how many renders) that spans.
+  // A plain time interval is the only gate that reliably skips a large,
+  // predictable stretch of training between redraws regardless of how long
+  // generations happen to run.
   let maxModeActive = false;
-  let maxModeLastRenderGen = -1;
   let maxModeLastRenderAt = 0;
   const MAX_MODE_STEP_BUDGET_MS = 150;
-  const MAX_MODE_RENDER_EVERY_GENERATIONS = 500;
-  const MAX_MODE_RENDER_FALLBACK_MS = 2000;
+  const MAX_MODE_RENDER_INTERVAL_MS = 5000;
   const maxModeBtn = topBar.querySelector<HTMLButtonElement>('#btn-max-mode');
 
   function updateMaxModeButtonStyle(): void {
@@ -363,15 +365,10 @@ function bootstrap(): void {
     simTrainer.maybeAutosave(performance.now() / 1000);
 
     const now = performance.now();
-    const generationsSinceRender = trainer.generation - maxModeLastRenderGen;
-    const dueForRender =
-      maxModeLastRenderGen < 0 ||
-      generationsSinceRender >= MAX_MODE_RENDER_EVERY_GENERATIONS ||
-      now - maxModeLastRenderAt >= MAX_MODE_RENDER_FALLBACK_MS;
+    const dueForRender = now - maxModeLastRenderAt >= MAX_MODE_RENDER_INTERVAL_MS;
 
     if (dueForRender && (currentView === 'simulation' || currentView === 'free')) {
       renderer.render(world, camera, input, currentFps, now / 1000);
-      maxModeLastRenderGen = trainer.generation;
       maxModeLastRenderAt = now;
     }
     if (dueForRender) {
@@ -389,8 +386,9 @@ function bootstrap(): void {
   function setMaxMode(active: boolean): void {
     if (maxModeActive === active) return;
     maxModeActive = active;
-    maxModeLastRenderGen = -1;
-    maxModeLastRenderAt = 0;
+    // -Infinity (not 0) so the very first batch after activating always
+    // renders immediately, rather than waiting out a full interval first.
+    maxModeLastRenderAt = -Infinity;
     updateMaxModeButtonStyle();
     updateSpeedButtonStyles();
     if (active) runMaxModeBatch();

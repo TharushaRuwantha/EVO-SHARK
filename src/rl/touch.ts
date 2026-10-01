@@ -37,6 +37,11 @@ export function computeTouch(self: Creature, world: World, out: Float32Array, ou
   if (self.y <= minY + eps) setContact(out, outOffset, -Math.PI / 2, self.heading, 'wall');
   if (self.y >= maxY - eps) setContact(out, outOffset, Math.PI / 2, self.heading, 'wall');
 
+  // Obstacles are few (a couple dozen at most), so a brute-force scan is
+  // cheap; plants and creatures can both be in the hundreds/thousands, so
+  // those are pruned with the shared spatial grids first -- touch only ever
+  // fires within a few body-radii, so almost everything in the full lists
+  // would've failed the distance check anyway.
   for (const obs of world.obstacles) {
     const dx = obs.x - self.x;
     const dy = obs.y - self.y;
@@ -46,7 +51,12 @@ export function computeTouch(self: Creature, world: World, out: Float32Array, ou
     }
   }
 
-  for (const plant of world.plants) {
+  // Largest possible contact distance: self's radius + the biggest plant/
+  // meat/creature radius we could touch. Generous but still tiny next to
+  // the world, so the grid query stays local.
+  const touchRange = r + CONFIG.plants.radius + CONFIG.species.shark.radius + CONFIG.remains.radius;
+
+  for (const plant of world.plantGrid.queryRadius(self.x, self.y, touchRange)) {
     const dx = plant.x - self.x;
     const dy = plant.y - self.y;
     const dist = Math.hypot(dx, dy);
@@ -64,8 +74,8 @@ export function computeTouch(self: Creature, world: World, out: Float32Array, ou
     }
   }
 
-  for (const other of world.allAliveCreatures) {
-    if (other === self) continue;
+  for (const other of world.creatureGrid.queryRadius(self.x, self.y, touchRange)) {
+    if (other === self || other.isDead) continue;
     const dx = other.x - self.x;
     const dy = other.y - self.y;
     const dist = Math.hypot(dx, dy);
