@@ -200,11 +200,14 @@ export class ProgressPanel {
 
     const seriesPerSession: { session: SessionRecord; points: GenerationRecord[] }[] = [];
     const allValues: number[] = [];
+    const liveValues: number[] = [];
     for (const session of sessions) {
       const points = this.downsample(session.history, 300);
       seriesPerSession.push({ session, points });
+      const isLive = session === sessions[sessions.length - 1] && sessions.length - 1 === liveIndex;
       for (const p of points) {
         allValues.push(p.sharkAvgReward, p.fishAvgReward);
+        if (isLive) liveValues.push(p.sharkAvgReward, p.fishAvgReward);
       }
     }
     const [rangeMin, rangeMax] = this.percentileRange(allValues, 0.05, 0.95);
@@ -233,6 +236,12 @@ export class ProgressPanel {
       );
     }
 
+    // Reference lines for the live session only (a comparison session's own
+    // min/max/avg would just clutter this) -- the lowest point, highest
+    // point, and the overall average reward reached, so the trend's actual
+    // range and center are legible at a glance without reading the axis.
+    this.drawReferenceLines(x, y, w, h, liveValues, rangeMin, rangeMax, (v) => v.toFixed(2));
+
     ctx.font = '9px monospace';
     ctx.fillStyle = '#64748b';
     ctx.textAlign = 'right';
@@ -254,10 +263,15 @@ export class ProgressPanel {
 
     const seriesPerSession: { session: SessionRecord; points: GenerationRecord[] }[] = [];
     const allValues: number[] = [];
+    const liveValues: number[] = [];
     for (const session of sessions) {
       const points = this.downsample(session.history, 300);
       seriesPerSession.push({ session, points });
-      for (const p of points) allValues.push(p.durationTicks);
+      const isLive = session === sessions[sessions.length - 1] && sessions.length - 1 === liveIndex;
+      for (const p of points) {
+        allValues.push(p.durationTicks);
+        if (isLive) liveValues.push(p.durationTicks);
+      }
     }
     const [, rangeMax] = this.percentileRange(allValues, 0.05, 0.95);
     const rangeMin = 0; // ticks can't go negative; always anchor the floor at 0
@@ -275,6 +289,8 @@ export class ProgressPanel {
         x, y, w, h, maxGen, rangeMin, rangeMax, '#94a3b8', !isLive
       );
     }
+
+    this.drawReferenceLines(x, y, w, h, liveValues, rangeMin, rangeMax, (v) => Math.round(v).toLocaleString());
 
     ctx.font = '9px monospace';
     ctx.fillStyle = '#64748b';
@@ -386,6 +402,64 @@ export class ProgressPanel {
     });
     ctx.stroke();
     ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Dashed horizontal lines marking the live session's lowest point, highest
+   * point, and mean -- so the overall range and center of the trend read at
+   * a glance, without having to trace the noisy/smoothed lines by eye.
+   * Clamped to the chart box the same way plotLine's points are, so a
+   * min/max outside the percentile-clipped axis still shows at the edge.
+   */
+  private drawReferenceLines(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    values: number[],
+    rangeMin: number,
+    rangeMax: number,
+    format: (v: number) => string
+  ): void {
+    if (values.length === 0) return;
+    const ctx = this.ctx;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const range = rangeMax - rangeMin || 1;
+
+    const yFor = (v: number): number => {
+      const raw = y + h - ((v - rangeMin) / range) * h;
+      return Math.max(y, Math.min(y + h, raw));
+    };
+
+    const drawLine = (value: number, color: string, label: string, alpha: number): void => {
+      const py = yFor(value);
+      ctx.save();
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, py);
+      ctx.lineTo(x + w, py);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.font = '8px monospace';
+      ctx.fillStyle = color;
+      ctx.globalAlpha = Math.min(1, alpha + 0.2);
+      ctx.textAlign = 'left';
+      // Nudge the label off the line itself (up if there's room, else down)
+      // so it doesn't sit directly on top of the dashes.
+      const labelY = py - y < 8 ? py + 9 : py - 3;
+      ctx.fillText(`${label} ${format(value)}`, x + 3, labelY);
+      ctx.globalAlpha = 1;
+    };
+
+    drawLine(max, '#f87171', 'high', 0.55);
+    drawLine(min, '#60a5fa', 'low', 0.55);
+    drawLine(avg, '#e2e8f0', 'avg', 0.7);
   }
 
   private drawLegend(sessions: readonly SessionRecord[], x: number, y: number, h: number): void {
