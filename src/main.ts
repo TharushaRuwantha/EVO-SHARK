@@ -82,6 +82,7 @@ function bootstrap(): void {
         <button data-speed="5" class="speed-btn px-2 py-1 rounded-lg font-medium text-[11px] transition-all duration-150 cursor-pointer active:scale-95">5x</button>
         <button data-speed="10" class="speed-btn px-2 py-1 rounded-lg font-medium text-[11px] transition-all duration-150 cursor-pointer active:scale-95">10x</button>
         <button data-speed="20" class="speed-btn px-2 py-1 rounded-lg font-medium text-[11px] transition-all duration-150 cursor-pointer active:scale-95">20x</button>
+        <button id="btn-max-mode" title="Max mode: trains as fast as the CPU allows, skipping rendering for hundreds of generations at a time" class="px-2 py-1 rounded-lg font-bold text-[11px] text-red-300 hover:bg-red-500/10 transition-all duration-150 cursor-pointer active:scale-95">🔥MAX</button>
       </div>
 
       <button id="btn-top-regen-plants" title="Regenerate all plants in the ocean" class="px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 font-medium flex items-center gap-1.5 transition-all duration-150 cursor-pointer active:scale-95">
@@ -306,7 +307,7 @@ function bootstrap(): void {
   const speedButtons = Array.from(topBar.querySelectorAll<HTMLButtonElement>('.speed-btn'));
   function updateSpeedButtonStyles(): void {
     for (const btn of speedButtons) {
-      const isActive = Number(btn.dataset.speed) === speedMultiplier;
+      const isActive = !maxModeActive && Number(btn.dataset.speed) === speedMultiplier;
       btn.classList.toggle('bg-cyan-500/20', isActive);
       btn.classList.toggle('text-cyan-300', isActive);
       btn.classList.toggle('text-slate-400', !isActive);
@@ -315,10 +316,90 @@ function bootstrap(): void {
   for (const btn of speedButtons) {
     btn.addEventListener('click', () => {
       speedMultiplier = Number(btn.dataset.speed) || 1;
+      setMaxMode(false);
       updateSpeedButtonStyles();
     });
   }
+
+  // Max mode: decouples training from wall-clock/rAF pacing entirely and
+  // steps the trainer in a tight, self-yielding loop bounded only by a CPU
+  // time budget, so a generation that would take 20 wall-clock seconds at
+  // 20x instead finishes as fast as the machine can compute it. Rendering
+  // (and the DOM stat readout) is skipped on most batches — only refreshed
+  // every MAX_MODE_RENDER_EVERY_GENERATIONS generations, or on a time
+  // fallback — since redrawing the canvas every tick would itself become
+  // the bottleneck at this pace.
+  let maxModeActive = false;
+  let maxModeLastRenderGen = -1;
+  let maxModeLastRenderAt = 0;
+  const MAX_MODE_STEP_BUDGET_MS = 150;
+  const MAX_MODE_RENDER_EVERY_GENERATIONS = 500;
+  const MAX_MODE_RENDER_FALLBACK_MS = 2000;
+  const maxModeBtn = topBar.querySelector<HTMLButtonElement>('#btn-max-mode');
+
+  function updateMaxModeButtonStyle(): void {
+    maxModeBtn?.classList.toggle('bg-red-500/20', maxModeActive);
+    maxModeBtn?.classList.toggle('text-red-300', maxModeActive);
+    maxModeBtn?.classList.toggle('animate-pulse', maxModeActive);
+  }
+
+  function runMaxModeBatch(): void {
+    if (!maxModeActive) return;
+    if (input.isPaused) {
+      setTimeout(runMaxModeBatch, 100);
+      return;
+    }
+
+    const budgetEnd = performance.now() + MAX_MODE_STEP_BUDGET_MS;
+    let stepped = 0;
+    while (performance.now() < budgetEnd) {
+      trainer.step();
+      stepped++;
+      // Only check the clock every so often -- calling performance.now()
+      // every single tick would itself eat a meaningful slice of the budget.
+      if (stepped % 500 === 0 && performance.now() >= budgetEnd) break;
+    }
+
+    simTrainer.maybeAutosave(performance.now() / 1000);
+
+    const now = performance.now();
+    const generationsSinceRender = trainer.generation - maxModeLastRenderGen;
+    const dueForRender =
+      maxModeLastRenderGen < 0 ||
+      generationsSinceRender >= MAX_MODE_RENDER_EVERY_GENERATIONS ||
+      now - maxModeLastRenderAt >= MAX_MODE_RENDER_FALLBACK_MS;
+
+    if (dueForRender && (currentView === 'simulation' || currentView === 'free')) {
+      renderer.render(world, camera, input, currentFps, now / 1000);
+      maxModeLastRenderGen = trainer.generation;
+      maxModeLastRenderAt = now;
+    }
+    if (dueForRender) {
+      updateTrainingStatsUI();
+    } else if (statGeneration && statSteps) {
+      // Cheap text-only refresh so the counters still visibly climb between
+      // full renders, without paying for a canvas redraw.
+      statGeneration.textContent = trainer.generation.toString();
+      statSteps.textContent = trainer.totalSteps.toLocaleString();
+    }
+
+    setTimeout(runMaxModeBatch, 0);
+  }
+
+  function setMaxMode(active: boolean): void {
+    if (maxModeActive === active) return;
+    maxModeActive = active;
+    maxModeLastRenderGen = -1;
+    maxModeLastRenderAt = 0;
+    updateMaxModeButtonStyle();
+    updateSpeedButtonStyles();
+    if (active) runMaxModeBatch();
+  }
+
+  maxModeBtn?.addEventListener('click', () => setMaxMode(!maxModeActive));
+
   updateSpeedButtonStyles();
+  updateMaxModeButtonStyle();
 
   topBar.querySelector('#btn-top-regen-plants')?.addEventListener('click', () => {
     world.triggerRegeneratePlants();
@@ -480,7 +561,7 @@ function bootstrap(): void {
     // speedMultiplier fast-forwards simulated time relative to wall-clock
     // time (more ticks run per rendered frame) rather than skipping
     // rendering, so the sim visibly runs faster instead of jumping.
-    if (!input.isPaused) {
+    if (!input.isPaused && !maxModeActive) {
       accumulator += deltaSec * speedMultiplier;
       let ticksThisFrame = 0;
       while (accumulator >= tickDt && ticksThisFrame < MAX_TICKS_PER_FRAME) {
@@ -495,14 +576,20 @@ function bootstrap(): void {
       }
     }
 
-    simTrainer.maybeAutosave(currentTime / 1000);
+    if (!maxModeActive) {
+      // In max mode, runMaxModeBatch's own self-scheduled loop owns
+      // autosaving -- it runs far more often than this rAF callback does
+      // once rendering is being skipped.
+      simTrainer.maybeAutosave(currentTime / 1000);
+    }
 
     // Update Camera position (smooth tracking if follow enabled)
     camera.followTarget = world.controlledCreature;
     camera.update();
 
-    // Render frame if a simulation arena is active
-    if (currentView === 'simulation' || currentView === 'free') {
+    // Render frame if a simulation arena is active (max mode renders on its
+    // own, much less frequently, from runMaxModeBatch instead).
+    if (!maxModeActive && (currentView === 'simulation' || currentView === 'free')) {
       renderer.render(world, camera, input, currentFps, currentTime / 1000);
       updateTrainingStatsUI();
 
