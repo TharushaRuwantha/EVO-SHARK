@@ -8,6 +8,12 @@ export interface GenerationRecord {
   durationTicks: number; // how long this generation lasted (ticks)
   sharkAvgReward: number;
   fishAvgReward: number;
+  // Mean policy entropy over the generation -- watch for this collapsing
+  // toward 0 (exploration dying / policy locking onto one action) versus
+  // reward staying flat with entropy still high (a credit-assignment
+  // problem instead). See SpeciesAgent.avgEntropy.
+  sharkEntropy: number;
+  fishEntropy: number;
   sharkEpisodes: number;
   fishEpisodes: number;
   sharkAliveEnd: number;
@@ -30,7 +36,12 @@ export interface SessionRecord {
 }
 
 export interface Checkpoint {
-  version: 1;
+  // Bumped from 1 -> 2 when the network changed from a REINFORCE policy-only
+  // MLP to an actor-critic MLP with a value head (see rl/network.ts). A v1
+  // checkpoint's `shark.network`/`fish.network` JSON is shaped differently
+  // (no `wv`/`bv`) and would silently produce garbage if loaded as v2, so
+  // Trainer.init() checks this and ignores anything that isn't exactly 2.
+  version: 2;
   generation: number;
   totalSteps: number;
   savedAt: string;

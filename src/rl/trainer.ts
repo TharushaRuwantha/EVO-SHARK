@@ -28,6 +28,8 @@ export interface TrainerStats {
   fishAlive: number;
   sharkAvgReward: number;
   fishAvgReward: number;
+  sharkAvgEntropy: number;
+  fishAvgEntropy: number;
   sharkEpisodes: number;
   fishEpisodes: number;
   resumedFromCheckpoint: boolean;
@@ -90,6 +92,19 @@ export class Trainer {
     const checkpoint = await loadCheckpoint();
     if (!checkpoint) return;
 
+    // A v1 checkpoint (REINFORCE policy-only network, no value head) isn't
+    // shaped like today's actor-critic network and would silently produce
+    // garbage if loaded as-is -- start fresh instead of crashing or running
+    // with nonsense weights. Same guard, same reasoning, as the pre-existing
+    // OBS_SIZE check below for an observation-layout change.
+    if (checkpoint.version !== 2) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[Trainer] Ignoring checkpoint with version=${checkpoint.version} (expected 2, the actor-critic network format); starting fresh training.`
+      );
+      return;
+    }
+
     // A checkpoint saved under a different observation layout (e.g. the
     // pre-refactor 16-input oracle sensors, or an earlier version of this
     // sensor suite before a since-fixed input count) can't be loaded into
@@ -140,7 +155,7 @@ export class Trainer {
 
   public buildCheckpoint(): Checkpoint {
     return {
-      version: 1,
+      version: 2,
       generation: this.generation,
       totalSteps: this.totalSteps,
       savedAt: new Date().toISOString(),
@@ -194,16 +209,44 @@ export class Trainer {
     const foodEatenBefore = new Map<number, number>();
     const cloneCountBefore = new Map<number, number>();
 
+    // Every shark shares one policy and every fish shares another, so their
+    // observations are gathered per species and run through one batched
+    // forward pass each (SpeciesAgent.actBatch) instead of calling the
+    // network once per creature -- same math, far less per-call JS overhead.
+    const sharkCreatures: Creature[] = [];
+    const sharkObs: Float32Array[] = [];
+    const fishCreatures: Creature[] = [];
+    const fishObs: Float32Array[] = [];
+
     for (const creature of world.allAliveCreatures) {
       creatureById.set(creature.id, creature);
       foodEatenBefore.set(creature.id, creature.biteScore);
       cloneCountBefore.set(creature.id, creature.cloneCount);
 
       const obs = buildObservation(creature, world);
-      const agent = this.agentFor(creature);
-      const { action, forward } = agent.act(obs);
+      if (creature.type === 'shark') {
+        sharkCreatures.push(creature);
+        sharkObs.push(obs);
+      } else {
+        fishCreatures.push(creature);
+        fishObs.push(obs);
+      }
+    }
+
+    const sharkResults = this.sharkAgent.actBatch(sharkObs);
+    for (let i = 0; i < sharkCreatures.length; i++) {
+      const creature = sharkCreatures[i];
+      const { action, forward } = sharkResults[i];
       inputs.set(creature.id, actionToInput(action));
-      actedThisTick.set(creature.id, { agent, action, forward });
+      actedThisTick.set(creature.id, { agent: this.sharkAgent, action, forward });
+    }
+
+    const fishResults = this.fishAgent.actBatch(fishObs);
+    for (let i = 0; i < fishCreatures.length; i++) {
+      const creature = fishCreatures[i];
+      const { action, forward } = fishResults[i];
+      inputs.set(creature.id, actionToInput(action));
+      actedThisTick.set(creature.id, { agent: this.fishAgent, action, forward });
     }
 
     const wasAlive = creatureById;
@@ -268,6 +311,8 @@ export class Trainer {
       durationTicks: this.world.ticks,
       sharkAvgReward: this.sharkAgent.avgReward,
       fishAvgReward: this.fishAgent.avgReward,
+      sharkEntropy: this.sharkAgent.avgEntropy,
+      fishEntropy: this.fishAgent.avgEntropy,
       sharkEpisodes: this.sharkAgent.episodesTrained,
       fishEpisodes: this.fishAgent.episodesTrained,
       sharkAliveEnd: this.world.aliveSharks.length,
@@ -291,6 +336,8 @@ export class Trainer {
       fishAlive: this.world.aliveFish.length,
       sharkAvgReward: this.sharkAgent.avgReward,
       fishAvgReward: this.fishAgent.avgReward,
+      sharkAvgEntropy: this.sharkAgent.avgEntropy,
+      fishAvgEntropy: this.fishAgent.avgEntropy,
       sharkEpisodes: this.sharkAgent.episodesTrained,
       fishEpisodes: this.fishAgent.episodesTrained,
       resumedFromCheckpoint: this.resumedFromCheckpoint,

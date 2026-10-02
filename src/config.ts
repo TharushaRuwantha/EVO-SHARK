@@ -107,15 +107,20 @@ export const CONFIG = {
   },
   rl: {
     hiddenSize: 24,
-    learningRate: 0.01,
+    // Adam adapts its own effective step size per parameter, so this can
+    // (and should) be smaller than the old plain-SGD learningRate (0.01).
+    learningRate: 0.003,
     rewardDiscount: 0.97,
-    baselineDecay: 0.98,
     maxEpisodeTicks: 60 * 90, // 90s safety cap per generation even without extinction
     autosaveIntervalSec: 15,
     perTickSurviveReward: 0.01,
     eatReward: 1.0,
     cloneReward: 2.0,
     deathPenalty: -1.0,
+    // Actor-critic knobs (see rl/network.ts ActorCriticNetwork):
+    valueLossCoef: 0.5, // weight on the critic's (V - return)^2 term
+    entropyCoef: 0.01, // weight on the exploration-encouraging entropy bonus
+    adam: { beta1: 0.9, beta2: 0.999, eps: 1e-8 },
   },
   remains: {
     decayTime: 50,
