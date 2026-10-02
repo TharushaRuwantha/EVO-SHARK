@@ -1,4 +1,4 @@
-import { ForwardResult, PolicyNetwork } from './rl/network';
+import { ActorCriticNetwork, ForwardResult } from './rl/network';
 import { Creature } from './creature';
 import { SENSOR_SECTIONS } from './rl/sensorLayout';
 
@@ -91,7 +91,7 @@ export class BrainVisualizer {
    * internally throttled to a modest refresh rate since this is a
    * diagnostic overlay, not something that needs full 60Hz precision.
    */
-  public render(creature: Creature, network: PolicyNetwork, forward: ForwardResult, action: number, nowMs: number): void {
+  public render(creature: Creature, network: ActorCriticNetwork, forward: ForwardResult, action: number, nowMs: number): void {
     if (!this.visible) return;
     if (nowMs - this.lastDrawMs < BrainVisualizer.MIN_REDRAW_INTERVAL_MS) return;
     this.lastDrawMs = nowMs;
@@ -115,8 +115,13 @@ export class BrainVisualizer {
     ctx.font = '9px monospace';
     ctx.fillStyle = '#64748b';
     ctx.fillText(`${network.inputSize} sensors → ${network.hiddenSize} hidden → ${network.outputSize} actions`, 14, 36);
+    // The critic's own self-assessment: its predicted value (expected future
+    // discounted return) of the current state, from the same forward pass
+    // that produced the action probabilities below.
+    ctx.fillStyle = forward.value >= 0 ? '#86efac' : '#fca5a5';
+    ctx.fillText(`critic V(s) = ${forward.value.toFixed(2)}`, 14, 48);
 
-    const top = 52;
+    const top = 70;
     const bottom = h - 16;
     const inputX = 60;
     const hiddenX = 250;
